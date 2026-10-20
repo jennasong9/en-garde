@@ -32,7 +32,8 @@ import {
   weekStats,
 } from './schedule.js';
 
-const DEFAULT_PROFILE = { name: 'Jenna Song', club: 'Point Fencing Club', rating: 'B26', weapon: 'Foil' };
+// What a new user sees until they fill in Settings: a blank name, no club and no rating.
+const DEFAULT_PROFILE = { name: 'Your name', club: '', rating: '', weapon: 'Foil' };
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MAX_CHIPS_PER_DAY = 2;
 
@@ -85,8 +86,8 @@ function describeDay(iso) {
 // ---------- header ----------
 function renderProfile() {
   $('#fencerName').textContent = profile.name;
-  const parts = [profile.weapon, profile.club, profile.rating ? 'Rating ' + profile.rating : ''];
-  $('#fencerDetails').textContent = parts.filter(Boolean).join(' · ');
+  const parts = [profile.weapon, profile.club || 'No club attached', profile.rating ? 'Rating ' + profile.rating : 'Unrated'];
+  $('#fencerDetails').textContent = parts.join(' · ');
 }
 
 function renderNextUp() {
