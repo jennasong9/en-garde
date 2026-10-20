@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>En Garde — Fencing Schedule</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <script>
+    // Pick the light or dark look before the page is drawn: the saved choice, else the device's.
+    (function () {
+      var theme = null;
+      try { theme = JSON.parse(localStorage.getItem('engarde_theme')); } catch (error) { theme = null; }
+      if (theme !== 'dark' && theme !== 'light') {
+        theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <div>
+        <h1 id="fencerName"></h1>
+        <p class="fencer-details" id="fencerDetails"></p>
+        <p class="fencer-links" id="fencerLinks"></p>
+      </div>
+      <div class="masthead-side">
+        <a class="mini-meals" id="miniMeals" href="#nutrition">
+          <span class="mini-meals-title">Next meals</span>
+          <ul class="mini-meals-list" id="miniMealList"></ul>
+        </a>
+        <a class="mini-ring" id="miniRing" href="#schedule">
+          <span class="mini-ring-dial">
+            <svg viewBox="0 0 44 44" aria-hidden="true">
+              <circle class="mini-track" cx="22" cy="22" r="18"></circle>
+              <circle class="mini-fill" id="miniRingFill" cx="22" cy="22" r="18"></circle>
+            </svg>
+            <span class="mini-count" id="miniRingCount">0/0</span>
+          </span>
+          <span class="mini-label" id="miniRingHours">0 hours trained</span>
+        </a>
+        <button class="settings-btn" id="settingsBtn" type="button" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9.78 4.73 L10.23 1.95 L13.77 1.95 L14.22 4.73 L15.57 5.29 L17.85 3.64 L20.36 6.15 L18.71 8.43 L19.27 9.78 L22.05 10.23 L22.05 13.77 L19.27 14.22 L18.71 15.57 L20.36 17.85 L17.85 20.36 L15.57 18.71 L14.22 19.27 L13.77 22.05 L10.23 22.05 L9.78 19.27 L8.43 18.71 L6.15 20.36 L3.64 17.85 L5.29 15.57 L4.73 14.22 L1.95 13.77 L1.95 10.23 L4.73 9.78 L5.29 8.43 L3.64 6.15 L6.15 3.64 L8.43 5.29 Z"></path>
+            <circle cx="12" cy="12" r="3.1"></circle>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="page-nav" aria-label="Pages">
+      <a class="page-link" id="navSchedule" href="#schedule">Schedule</a>
+      <a class="page-link" id="navRoutines" href="#routines">Routines</a>
+      <a class="page-link" id="navNutrition" href="#nutrition">Nutrition</a>
+      <a class="page-link" id="navJournal" href="#journal">Journal</a>
+      <a class="page-link" id="navGoals" href="#goals">Goals</a>
+    </nav>
+
+    <div id="schedulePage">
+    <section class="overview" aria-label="Overview">
+      <div class="card next-up">
+        <h2>Next on the strip</h2>
+        <ol class="next-list" id="nextList"></ol>
+      </div>
+      <div class="card stats">
+        <h2>This week</h2>
+        <div class="ring-wrap">
+          <div class="ring" role="img" id="weekRing">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+              <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="52"></circle>
+            </svg>
+            <div class="ring-center">
+              <span class="ring-count" id="ringCount">0/0</span>
+              <span class="ring-label">sessions done</span>
+            </div>
+          </div>
+          <p class="ring-hours"><b id="statHours">0</b> hours trained</p>
+          <button class="link-btn" id="viewCompletedBtn" type="button">View completed sessions</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card calendar-card" aria-label="Practice calendar">
+      <div class="calendar-head">
+        <h2 id="calendarTitle" aria-live="polite"></h2>
+        <div class="calendar-nav">
+          <button class="btn ghost" id="todayBtn" type="button">Today</button>
+          <button class="icon-btn" id="prevBtn" type="button">&#8249;</button>
+          <button class="icon-btn" id="nextBtn" type="button">&#8250;</button>
+        </div>
+      </div>
+      <div class="view-switch" id="viewSwitch" role="group" aria-label="Calendar view"></div>
+      <p class="hint">Click or tap a day to add or view sessions. Filter by type below.</p>
+      <div id="monthView">
+      <div class="weekdays" aria-hidden="true">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      </div>
+      <div class="tg-scroll" id="timeView" hidden></div>
+      <div class="filters" id="typeFilters" role="group" aria-label="Filter the calendar by session type"></div>
+    </section>
+    </div>
+
+    <section id="goalsPage" class="card" aria-label="Goals" hidden>
+      <div class="calendar-head">
+        <div>
+          <h2>Goals</h2>
+          <p class="goal-summary" id="goalSummary"></p>
+        </div>
+        <button class="btn" id="addGoalBtn" type="button">+ Pin a new goal</button>
+      </div>
+      <p class="hint">Add a new goal or tap the bars to track your progress.</p>
+      <div class="filters goal-filters" id="goalFilters" role="group" aria-label="Filter goals by tag"></div>
+      <div class="goal-options">
+        <label class="switch">
+          <input type="checkbox" id="hideCompleted">
+          <span>Hide completed</span>
+        </label>
+        <span class="goal-hidden-note" id="goalHiddenNote"></span>
+      </div>
+      <div class="goal-board" id="goalBoard"></div>
+    </section>
+
+    <section id="journalPage" class="card" aria-label="Journal" hidden>
+      <div class="calendar-head">
+        <h2 id="journalTitle" aria-live="polite"></h2>
+        <div class="calendar-nav" id="journalNav">
+          <button class="btn ghost" id="journalToday" type="button">Today</button>
+          <button class="icon-btn" id="journalPrev" type="button" aria-label="Previous month">&#8249;</button>
+          <button class="icon-btn" id="journalNext" type="button" aria-label="Next month">&#8250;</button>
+        </div>
+      </div>
+      <div class="journal-toolbar">
+        <div class="journal-toolbar-left">
+          <div class="view-switch" id="journalViewSwitch" role="group" aria-label="Journal view"></div>
+          <p class="hint" id="journalHint"></p>
+        </div>
+        <div class="journal-sort" id="journalSort" hidden>
+          <label class="field">Sort by
+            <select id="sortBy">
+              <option value="created">Date created</option>
+              <option value="edited">Date edited</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <label class="field" id="sortOrderField">Order
+            <select id="sortOrder">
+              <option value="desc">Descending (newest first)</option>
+              <option value="asc">Ascending (oldest first)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <p class="hint" id="sortHint" hidden>Drag the handle on an entry (or press the up and down arrow keys on it) to arrange your entries.</p>
+      <div id="journalCalendar">
+        <div class="weekdays" aria-hidden="true">
+          <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+        </div>
+        <div class="cal-grid" id="journalGrid"></div>
+      </div>
+      <div id="journalList" hidden></div>
+      <div class="filters" id="feelingFilters" role="group" aria-label="Filter the journal by feeling"></div>
+      <div class="journal-options" id="journalListOptions" hidden>
+        <label class="switch">
+          <input type="checkbox" id="popupToggle">
+          <span>Open entries in a pop-up</span>
+        </label>
+      </div>
+    </section>
+
+    <section id="routinesPage" class="card" aria-label="Routines" hidden>
+      <div class="calendar-head">
+        <div>
+          <h2>Routines</h2>
+          <p class="goal-summary" id="routineSummary"></p>
+        </div>
+        <button class="btn" id="addRoutineBtn" type="button">+ New routine</button>
+      </div>
+      <p class="hint">Your reusable drills. Pick a routine to see its steps.</p>
+      <div class="routine-layout">
+        <div class="routine-side">
+          <div class="routine-list" id="routineList" role="group" aria-label="Routines"></div>
+          <label class="switch-row routine-option" for="strikeToggle" id="routineOption" hidden>
+            <span>Strikethrough completed steps</span>
+            <input type="checkbox" role="switch" id="strikeToggle" class="switch-toggle">
+          </label>
+        </div>
+        <div class="routine-detail" id="routineDetail" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <div id="nutritionPage" hidden>
+      <div class="nutrition-top">
+        <section class="card" aria-label="Macro targets">
+          <h2>Daily macro targets</h2>
+          <p class="hint">Set your daily goals in grams. Each day in the plan below shows how its meals compare.</p>
+          <div class="macro-targets" id="macroTargets"></div>
+          <p class="macro-total" id="macroTotal"></p>
+          <p class="form-error" id="targetError" role="alert"></p>
+        </section>
+        <section class="card" aria-label="Hydration">
+          <h2>Hydration</h2>
+          <p class="hint">Tap a drop for each glass of water you drink. Resets every day.</p>
+          <div class="drops" id="drops"></div>
+          <p class="hydration-text" id="hydrationText"></p>
+          <label class="field goal-field">Daily goal (glasses)
+            <input type="number" id="glassGoal" min="1" max="20" inputmode="numeric">
+          </label>
+          <p class="form-error" id="goalError" role="alert"></p>
+        </section>
+      </div>
+      <section class="card" aria-label="Weekly meal plan">
+        <h2>Weekly meal plan</h2>
+        <p class="hint">Plan the meals for each day. The plan repeats every week. Tap a meal to edit or copy it, or tick it once it's prepped.</p>
+        <p class="status" id="mealStatus" role="status"></p>
+        <div class="meal-scroll"><div class="meal-grid" id="mealGrid"></div></div>
+      </section>
+    </div>
+  </div>
+
+  <dialog id="dayDialog" aria-labelledby="dayTitle">
+    <div class="dialog-head">
+      <h2 id="dayTitle"></h2>
+      <button class="icon-btn" id="dayClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p class="status" id="dayStatus" role="status"></p>
+
+    <div id="dayList"></div>
+    <button class="btn" id="addSessionBtn" type="button">+ Add a session</button>
+
+    <form id="sessionForm" hidden novalidate>
+      <h3 id="formTitle">Add a session</h3>
+      <label class="field">Session type
+        <select id="fType"></select>
+      </label>
+      <div class="field-row">
+        <label class="field">Time
+          <input type="time" id="fTime">
+        </label>
+        <label class="field">Duration (minutes)
+          <input type="number" id="fMins" min="0" max="600" step="5" inputmode="numeric">
+        </label>
+      </div>
+      <label class="field">Location
+        <input type="text" id="fLocation" maxlength="100" placeholder="e.g. Point Fencing Club">
+      </label>
+      <label class="field">Notes
+        <textarea id="fNotes" maxlength="500" placeholder="What is the focus of this session?"></textarea>
+      </label>
+
+      <div id="repeatBlock">
+        <label class="switch">
+          <input type="checkbox" id="fRepeat">
+          <span>Repeat this session</span>
+        </label>
+        <div id="repeatOptions" hidden>
+          <fieldset class="field">
+            <legend>Repeat on</legend>
+            <div class="day-chips" id="dayChips"></div>
+          </fieldset>
+          <label class="field">Repeat until
+            <input type="date" id="fUntil">
+          </label>
+          <p class="repeat-summary" id="repeatSummary"></p>
+        </div>
+      </div>
+      <p class="series-note" id="editNote" hidden>Your changes apply to this session. Turn on Repeat to also add copies of it on other days.</p>
+
+      <p class="form-error" id="formError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn ghost" id="cancelForm" type="button">Cancel</button>
+        <button class="btn" id="saveSession" type="submit">Save session</button>
+      </div>
+    </form>
+
+    <section id="conflictPanel" class="conflict-panel" aria-labelledby="conflictTitle" hidden>
+      <h3 id="conflictTitle">Identical session found</h3>
+      <p id="conflictIntro"></p>
+      <div class="conflict-bulk" id="conflictBulk">
+        <button class="link-btn small" id="conflictKeepAll" type="button">Keep both on every day</button>
+        <button class="link-btn small" id="conflictReplaceAll" type="button">Replace on every day</button>
+      </div>
+      <ul class="conflict-list" id="conflictList"></ul>
+      <div class="form-actions">
+        <button class="btn ghost" id="conflictBack" type="button">Back to edit</button>
+        <button class="btn" id="conflictApply" type="button">Save</button>
+      </div>
+    </section>
+  </dialog>
+
+  <dialog id="weekDialog" aria-labelledby="weekTitle">
+    <div class="dialog-head">
+      <h2 id="weekTitle">Completed this week</h2>
+      <button class="icon-btn" id="weekClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <div id="weekList"></div>
+  </dialog>
+
+  <dialog id="trackerDialog" aria-labelledby="trackerTitle">
+    <div class="dialog-head">
+      <h2 id="trackerTitle">Connect to FencingTracker</h2>
+      <button class="icon-btn" id="trackerClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="trackerForm" novalidate>
+      <p class="tracker-help">Open your page on fencingtracker.com, copy its address, and paste it here. A link to it will then show at the top of the app.</p>
+      <label class="field">Your FencingTracker profile link
+        <input type="text" id="trackerInput" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://fencingtracker.com/p/123456/Your-Name">
+      </label>
+      <p class="form-error" id="trackerError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn danger" id="trackerDisconnect" type="button" hidden>Disconnect</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="trackerCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Save link</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="routineDialog" aria-labelledby="routineDialogTitle">
+    <div class="dialog-head">
+      <h2 id="routineDialogTitle"></h2>
+      <button class="icon-btn" id="routineClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="routineForm" novalidate>
+      <div class="field-row">
+        <label class="field field-wide">Name
+          <input type="text" id="rName" maxlength="60" placeholder="e.g. Warm-up sequence">
+        </label>
+        <label class="field">Minutes
+          <input type="number" id="rMins" min="0" max="600" inputmode="numeric" placeholder="15">
+        </label>
+      </div>
+      <fieldset class="field steps-fieldset">
+        <legend>Steps</legend>
+        <div class="step-rows-head" aria-hidden="true"><span></span><span></span><span>Step name</span><span>Description</span><span></span></div>
+        <div class="step-rows" id="routineStepRows"></div>
+        <button class="btn ghost small" id="addStepBtn" type="button">+ Add step</button>
+      </fieldset>
+      <p class="form-error" id="routineError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn danger" id="routineDelete" type="button" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="routineCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Save routine</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="goalDialog" aria-labelledby="goalDialogTitle">
+    <div class="dialog-head">
+      <h2 id="goalDialogTitle"></h2>
+      <button class="icon-btn" id="goalClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="goalForm" novalidate>
+      <label class="field">Goal
+        <input type="text" id="gName" maxlength="120" placeholder="e.g. Land a clean fl&egrave;che under pressure">
+      </label>
+      <fieldset class="field">
+        <legend>Tag</legend>
+        <div class="day-chips" id="goalTagPicker"></div>
+      </fieldset>
+      <label class="field">Complete by (optional)
+        <input type="date" id="gDue">
+      </label>
+      <p class="form-error" id="goalFormError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn danger" id="goalDelete" type="button" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="goalCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Save goal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="entryViewDialog" aria-labelledby="entryViewTitle">
+    <div class="dialog-head">
+      <h2 id="entryViewTitle"></h2>
+      <button class="icon-btn" id="entryViewClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p class="journal-entry-feeling" id="entryViewFeeling"></p>
+    <p class="journal-entry-text entry-view-text" id="entryViewText"></p>
+    <div class="form-actions">
+      <button class="btn ghost" id="entryViewEdit" type="button">Edit</button>
+      <button class="btn" id="entryViewDone" type="button">Close</button>
+    </div>
+  </dialog>
+
+  <dialog id="journalDialog" aria-labelledby="journalDialogTitle">
+    <div class="dialog-head">
+      <h2 id="journalDialogTitle"></h2>
+      <button class="icon-btn" id="journalClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="journalForm" novalidate>
+      <div class="journal-layout">
+        <div class="journal-side">
+          <fieldset class="field">
+            <legend>How are you feeling?</legend>
+            <div class="feeling-picker" id="feelingPicker"></div>
+          </fieldset>
+          <div class="field">
+            <span>Need something to write about? Tap a prompt to add it.</span>
+            <div class="prompt-row" id="promptRow"></div>
+          </div>
+        </div>
+        <label class="field journal-main">Reflection
+          <textarea id="jText" class="journal-text" maxlength="2000" placeholder="How did your session go?"></textarea>
+        </label>
+      </div>
+      <p class="form-error" id="journalError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn danger" id="journalDelete" type="button" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="journalCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Save entry</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="mealDialog" aria-labelledby="mealDialogTitle">
+    <div class="dialog-head">
+      <h2 id="mealDialogTitle"></h2>
+      <button class="icon-btn" id="mealClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p class="series-note" id="mealLinkedNote" hidden></p>
+    <form id="mealForm" novalidate>
+      <label class="field">Meal
+        <input type="text" id="mName" maxlength="60" placeholder="e.g. Breakfast, Pre-training, Dinner">
+      </label>
+      <label class="field">What's in it?
+        <textarea id="mDesc" maxlength="300" placeholder="e.g. Oats with banana and peanut butter"></textarea>
+      </label>
+      <div class="field-row">
+        <label class="field">Time
+          <input type="time" id="mTime">
+        </label>
+        <label class="field">Calories (kcal)
+          <input type="number" id="mKcal" min="0" max="5000" step="10" inputmode="numeric">
+        </label>
+      </div>
+      <fieldset class="field">
+        <legend>Macros in this meal (grams, optional)</legend>
+        <div class="field-row">
+          <label class="field">Protein
+            <input type="number" id="mProtein" min="0" max="1000" inputmode="numeric">
+          </label>
+          <label class="field">Carbs
+            <input type="number" id="mCarb" min="0" max="1000" inputmode="numeric">
+          </label>
+          <label class="field">Fat
+            <input type="number" id="mFat" min="0" max="1000" inputmode="numeric">
+          </label>
+        </div>
+      </fieldset>
+      <label class="switch">
+        <input type="checkbox" id="mPrepped">
+        <span>Prepped</span>
+      </label>
+      <p class="form-error" id="mealError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn danger" id="mealDelete" type="button" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="mealCopy" type="button" hidden>Copy to other days</button>
+        <button class="btn ghost" id="mealCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Save meal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="linkedMealDialog" aria-labelledby="linkedMealTitle">
+    <div class="dialog-head">
+      <h2 id="linkedMealTitle">Apply to all days?</h2>
+      <button class="icon-btn" id="linkedMealClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p id="linkedMealText"></p>
+    <div class="form-actions move-duplicate-actions">
+      <button class="btn ghost" id="linkedMealBack" type="button">Back to edit</button>
+      <button class="btn ghost" id="linkedMealOne" type="button">Just this one</button>
+      <button class="btn" id="linkedMealAll" type="button">All days</button>
+    </div>
+  </dialog>
+
+  <dialog id="copyDialog" aria-labelledby="copyTitle">
+    <div class="dialog-head">
+      <h2 id="copyTitle"></h2>
+      <button class="icon-btn" id="copyClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="copyForm" novalidate>
+      <fieldset class="field">
+        <legend>Copy to</legend>
+        <div class="day-chips" id="copyDays"></div>
+      </fieldset>
+      <p class="series-note" id="copyNote"></p>
+      <p class="form-error" id="copyError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn ghost" id="copyCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Copy meals</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="moveDuplicateDialog" aria-labelledby="moveDuplicateTitle">
+    <div class="dialog-head">
+      <h2 id="moveDuplicateTitle">Identical session found</h2>
+      <button class="icon-btn" id="moveDuplicateClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p id="moveDuplicateText"></p>
+    <div class="form-actions move-duplicate-actions">
+      <button class="btn ghost" id="moveDuplicateCancel" type="button">Cancel move</button>
+      <button class="btn danger" id="moveDuplicateReplace" type="button">Replace existing</button>
+      <button class="btn" id="moveDuplicateKeep" type="button">Keep both</button>
+    </div>
+  </dialog>
+
+  <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+    <div class="dialog-head">
+      <h2 id="settingsTitle">Settings</h2>
+      <button class="icon-btn" id="settingsClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+
+    <section class="settings-section" aria-labelledby="appearanceTitle">
+      <h3 id="appearanceTitle">Appearance</h3>
+      <label class="switch-row" for="darkModeToggle">
+        <span>Dark mode</span>
+        <input type="checkbox" role="switch" id="darkModeToggle" class="switch-toggle">
+      </label>
+    </section>
+
+    <section class="settings-section" aria-labelledby="profileTitle">
+      <h3 id="profileTitle">Edit profile</h3>
+      <form id="profileForm" novalidate>
+        <label class="field">Name
+          <input type="text" id="pName" maxlength="60" required>
+        </label>
+        <label class="field">Club
+          <input type="text" id="pClub" maxlength="80">
+        </label>
+        <div class="field-row">
+          <label class="field">Rating
+            <input type="text" id="pRating" maxlength="12" placeholder="e.g. B26">
+          </label>
+          <label class="field">Weapon
+            <select id="pWeapon">
+              <option>Foil</option>
+              <option>Epee</option>
+              <option>Sabre</option>
+            </select>
+          </label>
+        </div>
+        <p class="form-error" id="profileError" role="alert"></p>
+        <div class="form-actions">
+          <button class="btn ghost" id="cancelProfile" type="button">Close</button>
+          <button class="btn" type="submit">Save profile</button>
+        </div>
+      </form>
+    </section>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
