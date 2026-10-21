@@ -2,6 +2,9 @@ import { $, el, formState, protectUnsavedChanges } from './dom.js';
 import {
   PROGRESS_STEPS,
   TAGS,
+  archivedGoals,
+  boardGoals,
+  canArchive,
   dueStatus,
   isUrgent,
   matchesTag,
@@ -22,6 +25,7 @@ const goalDialog = $('#goalDialog');
 let editingGoalId = null;
 let selectedTag = '';
 let confirmingDeleteId = null;
+let confirmingArchivedDeleteId = null;
 let confirmingDeleteInDialog = false;
 
 function persist() {
@@ -55,14 +59,16 @@ function plural(count, word) {
 }
 
 export function renderGoals() {
-  const finished = goals.filter((goal) => goal.progress >= 100).length;
-  $('#goalSummary').textContent = goals.length === 0
+  const onBoard = boardGoals(goals);
+  const finished = onBoard.filter((goal) => goal.progress >= 100).length;
+  $('#goalSummary').textContent = onBoard.length === 0
     ? 'Nothing pinned yet.'
-    : goals.length - finished + ' in progress · ' + finished + ' completed';
+    : onBoard.length - finished + ' in progress · ' + finished + ' completed';
   renderTagFilters();
   $('#hideCompleted').checked = hideCompleted;
   $('#goalHiddenNote').textContent = hideCompleted && finished > 0 ? plural(finished, 'completed goal') + ' hidden' : '';
   renderBoard();
+  renderArchive();
 }
 
 function renderTagFilters() {
@@ -93,13 +99,14 @@ function renderTagFilters() {
 function renderBoard() {
   const board = $('#goalBoard');
   board.replaceChildren();
-  if (goals.length === 0) {
+  const onBoard = boardGoals(goals);
+  if (onBoard.length === 0) {
     board.append(el('p', { class: 'empty', text: 'No goals yet. Tap "+ Pin a new goal" to put your first one on the board.' }));
     return;
   }
-  const shown = visibleGoals(goals, activeTags, hideCompleted);
+  const shown = visibleGoals(onBoard, activeTags, hideCompleted);
   if (shown.length === 0) {
-    const taggedGoals = goals.filter((goal) => matchesTag(goal, activeTags));
+    const taggedGoals = onBoard.filter((goal) => matchesTag(goal, activeTags));
     board.append(el('p', {
       class: 'empty',
       text: taggedGoals.length === 0
@@ -211,7 +218,11 @@ function noteActions(goal) {
         },
       }));
   }
+  const archiveButtons = canArchive(goal)
+    ? [el('button', { class: 'btn ghost small', type: 'button', text: 'Archive', 'aria-label': 'Archive ' + goal.name, onclick: () => archiveGoal(goal) })]
+    : [];
   return el('div', { class: 'sticky-actions' },
+    ...archiveButtons,
     el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', 'aria-label': 'Edit ' + goal.name, onclick: () => openGoalForm(goal) }),
     el('button', {
       class: 'btn danger small',
@@ -223,6 +234,75 @@ function noteActions(goal) {
         renderGoals();
       },
     }));
+}
+
+function archiveGoal(goal) {
+  goal.archived = true;
+  goal.archivedOn = toIso(new Date());
+  persist();
+  renderGoals();
+}
+
+function restoreGoal(goal) {
+  delete goal.archived;
+  delete goal.archivedOn;
+  persist();
+  renderGoals();
+}
+
+function renderArchive() {
+  const archived = archivedGoals(goals);
+  $('#goalArchive').hidden = archived.length === 0 && goals.length === 0;
+  $('#goalArchiveSummary').textContent = 'Archive (' + archived.length + ')';
+  const list = $('#archiveList');
+  if (archived.length === 0) {
+    list.replaceChildren(el('p', { class: 'empty', text: 'Nothing archived yet. Finish a goal, then tap "Archive" on its note.' }));
+    return;
+  }
+  list.replaceChildren(...archived.map(archivedItem));
+}
+
+function archivedItem(goal) {
+  const archivedText = goal.archivedOn
+    ? ' · archived ' + parseIso(goal.archivedOn).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+  const actions = confirmingArchivedDeleteId === goal.id
+    ? [
+      el('span', { text: 'Delete forever?' }),
+      el('button', { class: 'btn danger small', type: 'button', text: 'Yes, delete', onclick: () => deleteArchivedGoal(goal.id) }),
+      el('button', {
+        class: 'btn ghost small',
+        type: 'button',
+        text: 'Keep it',
+        onclick: () => {
+          confirmingArchivedDeleteId = null;
+          renderGoals();
+        },
+      }),
+    ]
+    : [
+      el('button', { class: 'btn ghost small', type: 'button', text: 'Restore', 'aria-label': 'Restore ' + goal.name, onclick: () => restoreGoal(goal) }),
+      el('button', {
+        class: 'btn danger small',
+        type: 'button',
+        text: 'Delete',
+        'aria-label': 'Permanently delete ' + goal.name,
+        onclick: () => {
+          confirmingArchivedDeleteId = goal.id;
+          renderGoals();
+        },
+      }),
+    ];
+  return el('div', { class: 'archive-item' },
+    el('div', { class: 'archive-info' },
+      el('span', { class: 'archive-name', text: goal.name }),
+      el('span', { class: 'archive-meta', text: TAGS[goal.tag].label + archivedText })),
+    el('div', { class: 'archive-actions' }, ...actions));
+}
+
+function deleteArchivedGoal(id) {
+  confirmingArchivedDeleteId = null;
+  deleteGoal(id);
 }
 
 function deleteGoal(id) {

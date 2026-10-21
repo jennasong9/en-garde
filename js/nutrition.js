@@ -1,10 +1,13 @@
+import { burstConfetti } from './confetti.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import {
   DAY_NAMES,
   MACROS,
   MAX_GRAMS,
+  MEAL_SLOTS,
   addTemplateToDays,
   addToHistory,
+  allPrepped,
   applyToLinked,
   changesSharedDetails,
   clearOrder,
@@ -27,6 +30,7 @@ import {
   searchHistory,
 } from './meals.js';
 import { makeId, formatTime } from './schedule.js';
+import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import { renderNextMeals } from './next-meals.js';
 import { loadJson, saveJson } from './storage.js';
 
@@ -188,9 +192,12 @@ function mealCard(meal) {
   const prepBox = el('input', { type: 'checkbox', 'aria-label': 'Prepped: ' + meal.name });
   prepBox.checked = Boolean(meal.prepped);
   prepBox.addEventListener('change', () => {
+    const wasDone = allPrepped(dayTotals(meals, meal.day));
     meal.prepped = prepBox.checked;
+    const box = prepBox.getBoundingClientRect();
     persist();
     renderNutrition();
+    if (!wasDone && allPrepped(dayTotals(meals, meal.day))) burstConfetti(box.left + box.width / 2, box.top + box.height / 2);
   });
 
   const main = el('button', {
@@ -417,12 +424,25 @@ function addFromHistory(template, days, index = null) {
 }
 
 // ---------- add / edit a meal ----------
+// The meal name is picked from a list of the usual kinds of meal. A meal saved earlier with some
+// other name (like "Oats") keeps it: that name is added to the list while its box is open.
+const mealNameBox = $('#mName');
+// A new meal starts on "Select..." and cannot be saved until a kind is chosen.
+mealNameBox.append(el('option', { value: '', text: 'Select...', disabled: '' }));
+for (const slot of MEAL_SLOTS) mealNameBox.append(el('option', { value: slot, text: slot }));
+
+function setMealName(name) {
+  mealNameBox.querySelectorAll('option[data-extra]').forEach((option) => option.remove());
+  if (name !== '' && !MEAL_SLOTS.includes(name)) mealNameBox.append(el('option', { value: name, text: name, 'data-extra': '' }));
+  mealNameBox.value = name;
+}
+
 function openMealForm(meal, day) {
   editingMealId = meal ? meal.id : null;
   formDay = day;
   confirmingDelete = false;
   $('#mealDialogTitle').textContent = (meal ? 'Edit meal' : 'Add a meal') + ' — ' + DAY_NAMES[day];
-  $('#mName').value = meal ? meal.name : '';
+  setMealName(meal ? meal.name : '');
   $('#mDesc').value = meal ? meal.desc : '';
   $('#mTime').value = meal ? meal.time : '';
   $('#mKcal').value = meal && meal.kcal !== null ? meal.kcal : '';
@@ -449,7 +469,7 @@ $('#mealForm').addEventListener('submit', (event) => {
   const name = $('#mName').value.trim();
   const kcal = parseKcal($('#mKcal').value);
   if (!name) {
-    $('#mealError').textContent = 'Give the meal a name, like Breakfast or Dinner.';
+    $('#mealError').textContent = 'Choose what kind of meal this is.';
     return;
   }
   const grams = {
@@ -548,6 +568,136 @@ $('#mealDelete').addEventListener('click', () => {
 const mealGuard = protectUnsavedChanges(mealDialog, () => formState($('#mealForm')));
 $('#mealClose').addEventListener('click', () => mealDialog.close());
 $('#mealCancel').addEventListener('click', () => mealDialog.close());
+
+// ---------- saved weekly meal plans ----------
+// "Save weekly meal plan" keeps a copy of every meal in the week (nothing ticked as prepped), and
+// "Load saved meal plan" puts one of those copies back in place of the current week.
+const storedPlans = loadJson('mealPlans', []);
+let savedPlans = Array.isArray(storedPlans) ? storedPlans : [];
+const savePlanDialog = $('#savePlanDialog');
+const loadPlanDialog = $('#loadPlanDialog');
+// The plan whose Load or Delete button was pressed once and is waiting for a second press.
+let confirming = null;
+
+function persistPlans() {
+  saveJson('mealPlans', savedPlans);
+}
+
+$('#savePlanBtn').addEventListener('click', () => {
+  $('#planName').value = defaultPlanName(new Date(), savedPlans);
+  $('#savePlanError').textContent = '';
+  $('#savePlanSummary').textContent = meals.length === 0
+    ? 'There are no meals in this week yet, so there is nothing to save.'
+    : 'This will save ' + planSummary({ meals }) + '.';
+  savePlanDialog.showModal();
+  savePlanGuard.reset();
+  $('#planName').select();
+});
+
+$('#savePlanForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (meals.length === 0) {
+    $('#savePlanError').textContent = 'Add some meals to the week first.';
+    return;
+  }
+  const problem = validatePlanName($('#planName').value, savedPlans);
+  if (problem) {
+    $('#savePlanError').textContent = problem;
+    return;
+  }
+  const plan = snapshotPlan(meals, $('#planName').value, new Date().toISOString(), makeId);
+  savedPlans = [plan, ...savedPlans];
+  persistPlans();
+  savePlanDialog.close();
+  showMealStatus('Saved "' + plan.name + '" (' + planSummary(plan) + ').');
+});
+
+$('#loadPlanBtn').addEventListener('click', () => {
+  confirming = null;
+  renderPlanList();
+  loadPlanDialog.showModal();
+});
+
+function renderPlanList() {
+  const list = $('#planList');
+  $('#loadPlanHelp').hidden = savedPlans.length === 0;
+  if (savedPlans.length === 0) {
+    list.replaceChildren(el('li', { class: 'empty', text: 'No saved plans yet. Use "Save weekly meal plan" to keep one.' }));
+    return;
+  }
+  list.replaceChildren(...savedPlans.map((plan) => {
+    const saved = new Date(plan.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const asking = confirming && confirming.id === plan.id ? confirming.action : null;
+    const row = el('li', { class: 'plan-item' },
+      el('div', { class: 'plan-info' },
+        el('b', { text: plan.name }),
+        el('span', { text: 'Saved ' + saved + ' · ' + planSummary(plan) })));
+    if (asking) {
+      row.append(el('div', { class: 'plan-confirm' },
+        el('span', { text: asking === 'load' ? 'Replace this week\'s meals?' : 'Delete this plan?' }),
+        el('button', {
+          class: 'btn small' + (asking === 'delete' ? ' danger' : ''),
+          type: 'button',
+          text: asking === 'load' ? 'Yes, load it' : 'Yes, delete',
+          onclick: () => (asking === 'load' ? loadPlan(plan) : deletePlan(plan)),
+        }),
+        el('button', {
+          class: 'btn ghost small',
+          type: 'button',
+          text: 'Cancel',
+          onclick: () => {
+            confirming = null;
+            renderPlanList();
+          },
+        })));
+    } else {
+      row.append(el('div', { class: 'plan-buttons' },
+        el('button', {
+          class: 'btn small',
+          type: 'button',
+          text: 'Load',
+          'aria-label': 'Load ' + plan.name,
+          onclick: () => {
+            confirming = { id: plan.id, action: 'load' };
+            renderPlanList();
+          },
+        }),
+        el('button', {
+          class: 'btn danger small',
+          type: 'button',
+          text: 'Delete',
+          'aria-label': 'Delete ' + plan.name,
+          onclick: () => {
+            confirming = { id: plan.id, action: 'delete' };
+            renderPlanList();
+          },
+        })));
+    }
+    return row;
+  }));
+}
+
+function loadPlan(plan) {
+  meals = mealsFromPlan(plan, makeId);
+  persist();
+  confirming = null;
+  loadPlanDialog.close();
+  renderNutrition();
+  showMealStatus('Loaded "' + plan.name + '" (' + planSummary(plan) + '). Everything starts unticked.');
+}
+
+function deletePlan(plan) {
+  savedPlans = savedPlans.filter((other) => other.id !== plan.id);
+  persistPlans();
+  confirming = null;
+  renderPlanList();
+}
+
+const savePlanGuard = protectUnsavedChanges(savePlanDialog, () => formState($('#savePlanForm')));
+$('#savePlanClose').addEventListener('click', () => savePlanDialog.close());
+$('#savePlanCancel').addEventListener('click', () => savePlanDialog.close());
+closeOnBackdropClick(loadPlanDialog);
+$('#loadPlanClose').addEventListener('click', () => loadPlanDialog.close());
 
 // ---------- copy a day, or one meal, to other days ----------
 // `copySource` is { day } to copy a whole day, or { meal } to copy just that meal.

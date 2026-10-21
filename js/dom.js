@@ -23,6 +23,21 @@ export function formState(root) {
   return [fields, pressed];
 }
 
+// Calls `handler` when the dimmed area around a dialog is clicked. The press has to start on the
+// dimmed area too: a drag that starts inside the dialog (like selecting the text in a box) and ends
+// outside it makes the browser report a click on the dialog itself, and that must not count.
+function onBackdropClick(dialog, handler) {
+  let pressedOnBackdrop = false;
+  dialog.addEventListener('pointerdown', (event) => {
+    pressedOnBackdrop = event.target === dialog;
+  });
+  dialog.addEventListener('click', (event) => {
+    if (event.target !== dialog || !pressedOnBackdrop) return;
+    pressedOnBackdrop = false;
+    handler();
+  });
+}
+
 // Keeps a dialog with a form open when the user clicks outside it (or presses Escape) while it
 // holds changes that were not saved, and shows a warning inside it instead. With nothing changed it
 // closes as usual. `getState()` returns the dialog's current state (see formState). Call
@@ -47,8 +62,7 @@ export function protectUnsavedChanges(dialog, getState) {
     warning.scrollIntoView({ block: 'nearest' });
   };
 
-  dialog.addEventListener('click', (event) => {
-    if (event.target !== dialog) return;
+  onBackdropClick(dialog, () => {
     if (isDirty()) warn();
     else dialog.close();
   });
@@ -72,9 +86,7 @@ export function protectUnsavedChanges(dialog, getState) {
 
 // Closes a dialog when the dimmed area around it is clicked.
 export function closeOnBackdropClick(dialog) {
-  dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) dialog.close();
-  });
+  onBackdropClick(dialog, () => dialog.close());
 }
 
 const MOUSE_DRAG_PIXELS = 4;
@@ -84,7 +96,8 @@ const TOUCH_SCROLL_PIXELS = 8;
 // Makes an element draggable. A mouse drags straight away; a finger has to press and hold first,
 // so scrolling the page still works. `handlers.move(event, dx, dy)` runs while dragging (dx and
 // dy are the distance from where it started), `handlers.drop(event)` when released, and
-// `handlers.cancel()` if the browser abandons the drag. Returns nothing.
+// `handlers.cancel()` if the browser abandons the drag. If `handlers.canStart(event)` is given and
+// returns false, a press there is ignored. Returns nothing.
 export function makeDraggable(element, handlers) {
   let pressed = false;
   let dragging = false;
@@ -106,6 +119,7 @@ export function makeDraggable(element, handlers) {
 
   element.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (handlers.canStart && !handlers.canStart(event)) return;
     pressed = true;
     dragging = false;
     usingTouch = event.pointerType !== 'mouse';

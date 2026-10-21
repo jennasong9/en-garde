@@ -47,6 +47,22 @@ export function sortGoals(goals) {
   });
 }
 
+// Only finished goals can be archived; archived goals leave the board and wait in the archive.
+export function canArchive(goal) {
+  return goal.progress >= 100 && !goal.archived;
+}
+
+export function boardGoals(goals) {
+  return goals.filter((goal) => !goal.archived);
+}
+
+// Archived goals, most recently archived first (goals archived before dates were kept go last).
+export function archivedGoals(goals) {
+  return goals
+    .filter((goal) => goal.archived)
+    .sort((a, b) => (b.archivedOn || '').localeCompare(a.archivedOn || ''));
+}
+
 // An empty filter set means "show every tag".
 export function matchesTag(goal, activeTags) {
   return activeTags.size === 0 || activeTags.has(goal.tag);

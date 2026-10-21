@@ -518,6 +518,18 @@ textarea { min-height: 76px; resize: vertical; }
 .sticky-actions .btn.small { background: var(--note-button); }
 .sticky-confirm { font-size: 13px; }
 
+.goal-archive { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 14px; }
+.goal-archive summary { cursor: pointer; font-weight: 600; min-height: 36px; display: flex; align-items: center; gap: 8px; list-style: none; }
+.goal-archive summary::-webkit-details-marker { display: none; }
+.goal-archive summary::after { content: ''; width: 8px; height: 8px; margin-top: -3px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); transition: transform .15s ease, margin .15s ease; }
+.goal-archive[open] summary::after { margin-top: 3px; transform: rotate(-135deg); }
+.archive-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.archive-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.archive-info { flex: 1; min-width: 160px; }
+.archive-name { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.archive-meta { font-size: 12px; color: var(--text-dim); }
+.archive-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+
 /* ===== Journal ===== */
 .feeling-sharp { --c: #5f8f6a; }
 .feeling-steady { --c: var(--footwork); }
@@ -558,6 +570,17 @@ textarea { min-height: 76px; resize: vertical; }
 .entry-view-text { margin: 8px 0 14px; max-height: 55vh; overflow-y: auto; }
 .journal-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .entry-toggle { min-height: 36px; font-size: 14px; }
+
+/* ===== Saved meal plans ===== */
+.plan-head { flex-wrap: wrap; }
+.plan-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+#loadPlanDialog { width: min(560px, calc(100% - 24px)); }
+.plan-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.plan-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); }
+.plan-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.plan-info span { font-size: 13px; color: var(--text-dim); }
+.plan-buttons, .plan-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.plan-confirm span { font-size: 14px; font-weight: 600; }
 
 /* ===== Nutrition ===== */
 .nutrition-top { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }

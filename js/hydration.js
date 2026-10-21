@@ -1,5 +1,6 @@
 import { $, el, makeDraggable } from './dom.js';
-import { DEFAULT_GLASS_GOAL, MAX_GLASS_GOAL, glassesToday, tapGlass } from './meals.js';
+import { burstConfetti } from './confetti.js';
+import { DEFAULT_GLASS_GOAL, MAX_GLASS_GOAL, glassesToday, reachedWaterGoal, tapGlass } from './meals.js';
 import { toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
 
@@ -37,14 +38,16 @@ function showGlasses(glasses) {
     drop.classList.toggle('filled', index < glasses);
     drop.setAttribute('aria-pressed', String(index < glasses));
   });
-  const reached = glasses >= hydration.goal;
-  $('#hydrationText').textContent = glasses + ' of ' + hydration.goal + ' glasses' + (reached ? ' — goal reached!' : '');
+  $('#hydrationText').textContent = glasses + ' of ' + hydration.goal + ' glasses';
 }
 
-function setGlasses(glasses) {
+// Saves the count. Confetti pops from (x, y) when this release is the one that reaches the goal.
+function setGlasses(glasses, x, y) {
+  const reached = reachedWaterGoal(currentGlasses(), glasses, hydration.goal);
   hydration = { ...hydration, date: toIso(new Date()), glasses };
   persist();
   renderHydration();
+  if (reached) burstConfetti(x, y);
 }
 
 // ---------- tap or drag across the drops ----------
@@ -80,14 +83,22 @@ function dropIndexUnder(x, y) {
 }
 
 let ignoreNextClick = false;
+// The drop a mouse or finger went down on, so a press that starts on empty space and ends on a
+// drop is not mistaken for a tap on that drop.
+let pressedDropIndex = -1;
+dropsBox.addEventListener('pointerdown', (event) => {
+  pressedDropIndex = dropIndexUnder(event.clientX, event.clientY);
+});
 // Dragging across the drops sets the count as you go and saves when you let go. A plain tap fills
 // up to that drop, or takes the last filled one back.
 makeDraggable(dropsBox, {
+  // Only a press on a drop starts a drag; the empty space beside the drops does nothing.
+  canStart: (event) => event.target.closest('.drop') !== null,
   move: (event) => showGlasses(dropIndexAt(event.clientX, event.clientY) + 1),
   drop: (event) => {
     ignoreNextClick = true;
     setTimeout(() => { ignoreNextClick = false; }, 0);
-    setGlasses(dropIndexAt(event.clientX, event.clientY) + 1);
+    setGlasses(dropIndexAt(event.clientX, event.clientY) + 1, event.clientX, event.clientY);
   },
   cancel: renderHydration,
 });
@@ -97,7 +108,11 @@ dropsBox.addEventListener('click', (event) => {
   const index = event.detail === 0
     ? dropButtons().indexOf(event.target.closest('.drop'))
     : dropIndexUnder(event.clientX, event.clientY);
-  if (index >= 0) setGlasses(tapGlass(currentGlasses(), index));
+  if (index < 0 || (event.detail !== 0 && index !== pressedDropIndex)) return;
+  const box = dropButtons()[index].getBoundingClientRect();
+  const x = event.detail === 0 ? box.left + box.width / 2 : event.clientX;
+  const y = event.detail === 0 ? box.top : event.clientY;
+  setGlasses(tapGlass(currentGlasses(), index), x, y);
 });
 
 function dropIcon() {

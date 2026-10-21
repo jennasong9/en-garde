@@ -4,17 +4,20 @@
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const MAX_KCAL = 5000;
 
+// The kinds of meal offered when adding one, in the order a day usually goes.
+export const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Pre-training', 'Dinner', 'Snack'];
+
 // Where a meal sits in a day's default order, in minutes. A meal with a time goes by that time.
-// Breakfast, Lunch and Dinner without a time use a typical time, so they always come out in that
-// order. Any other meal without a time goes last.
-const TYPICAL_MINUTES = { breakfast: 7 * 60, lunch: 12 * 60, dinner: 18 * 60 + 30 };
+// Breakfast, Lunch, Pre-training and Dinner without a time use a typical time, so they come out in
+// that order. Any other meal without a time goes last.
+const TYPICAL_MINUTES = { breakfast: 7 * 60, lunch: 12 * 60, 'pre-training': 16 * 60 + 30, dinner: 18 * 60 + 30 };
 
 function defaultPosition(meal) {
   if (meal.time) {
     const [hours, minutes] = meal.time.split(':').map(Number);
     return hours * 60 + minutes;
   }
-  const named = /^\s*(breakfast|lunch|dinner)\b/i.exec(meal.name || '');
+  const named = /^\s*(breakfast|lunch|pre-training|dinner)\b/i.exec(meal.name || '');
   return named ? TYPICAL_MINUTES[named[1].toLowerCase()] : Infinity;
 }
 
@@ -61,6 +64,11 @@ export function dayTotals(meals, day) {
     prepped: dayMeals.filter((meal) => meal.prepped).length,
     kcal: dayMeals.reduce((sum, meal) => sum + (meal.kcal || 0), 0),
   };
+}
+
+// True when a day has meals and every one is prepped (what earns the confetti).
+export function allPrepped(totals) {
+  return totals.count > 0 && totals.prepped === totals.count;
 }
 
 function parseWholeNumber(text, max, what) {
@@ -131,6 +139,11 @@ export function glassesToday(hydration, todayIso) {
 // Tapping glass number `index` (0-based) fills up to it; tapping the last filled glass undoes it.
 export function tapGlass(current, index) {
   return index + 1 === current ? current - 1 : index + 1;
+}
+
+// Confetti when a release takes the day's water from short of the goal to the goal.
+export function reachedWaterGoal(before, after, goal) {
+  return before < goal && after >= goal;
 }
 
 // The details of a meal that "apply to all days" changes. Which day it is on and whether it is

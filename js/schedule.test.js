@@ -1,4 +1,5 @@
 import { parseFencerLink } from './fencingtracker.js';
+import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import {
   STARTER_ROUTINES,
   normalizeSteps,
@@ -10,7 +11,7 @@ import {
   toggleStep,
   validateRoutine,
 } from './routines.js';
-import { dueStatus, isUrgent, matchesTag, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
+import { archivedGoals, boardGoals, canArchive, dueStatus, isUrgent, matchesTag, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
 import { appendPrompt, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import {
   addTemplateToDays,
@@ -28,6 +29,7 @@ import {
   macroKcal,
   macroProgress,
   macroShares,
+  MEAL_SLOTS,
   mealTemplate,
   mealsOn,
   mergeIntoHistory,
@@ -37,6 +39,8 @@ import {
   placeMeal,
   removeFromHistory,
   searchHistory,
+  allPrepped,
+  reachedWaterGoal,
   tapGlass,
   upcomingMeals,
 } from './meals.js';
@@ -317,6 +321,20 @@ test('glassesToday only counts glasses logged on the same date', () => {
   equal(glassesToday({ date: '', glasses: 0 }, '2026-10-13'), 0);
 });
 
+test('allPrepped is true only for a day that has meals and all are prepped', () => {
+  equal(allPrepped({ count: 3, prepped: 3 }), true);
+  equal(allPrepped({ count: 3, prepped: 2 }), false);
+  equal(allPrepped({ count: 0, prepped: 0 }), false);
+});
+
+test('reachedWaterGoal is true only on the release that completes the day', () => {
+  equal(reachedWaterGoal(7, 8, 8), true);
+  equal(reachedWaterGoal(2, 8, 8), true);
+  equal(reachedWaterGoal(8, 8, 8), false);
+  equal(reachedWaterGoal(8, 7, 8), false);
+  equal(reachedWaterGoal(3, 5, 8), false);
+});
+
 test('tapGlass fills up to the tapped glass and undoes when the last one is tapped again', () => {
   equal(tapGlass(0, 2), 3);
   equal(tapGlass(3, 5), 6);
@@ -461,6 +479,20 @@ test('visibleGoals applies the tag filter and, when asked, hides completed goals
   equal(visibleGoals(all, new Set(), true).map((g) => g.id), ['b']);
   equal(visibleGoals(all, new Set(['tactics']), false).map((g) => g.id), ['c']);
   equal(visibleGoals(all, new Set(['tactics']), true), []);
+});
+
+test('only finished, unarchived goals can be archived', () => {
+  equal(canArchive(goal('a', { progress: 100 })), true);
+  equal(canArchive(goal('a', { progress: 80 })), false);
+  equal(canArchive(goal('a', { progress: 100, archived: true })), false);
+});
+
+test('archived goals leave the board and list newest archive first', () => {
+  const all = [goal('a', { progress: 100, archived: true, archivedOn: '2026-10-01' }), goal('b'),
+    goal('c', { progress: 100, archived: true, archivedOn: '2026-10-20' }), goal('d', { progress: 100, archived: true })];
+  equal(boardGoals(all).map((g) => g.id), ['b']);
+  equal(archivedGoals(all).map((g) => g.id), ['c', 'a', 'd']);
+  equal(archivedGoals([goal('x')]), []);
 });
 
 const full = (id, date, extra = {}) => ({ id, date, type: 'bout', time: '18:00', mins: 75, location: 'Strip 3', notes: '', done: false, ...extra });
@@ -777,6 +809,59 @@ test('editing keeps the check on steps that did not change (name and description
   equal(reconcileDone(r, [row('A', 'x'), row('B changed'), row('C'), row('D')], '2026-10-20').done, [true, false, false, true]);
   equal(reconcileDone(r, [row('A', 'new description'), row('B')], '2026-10-20').done, [false, true]);
   equal(reconcileDone(r, [row('A', 'x'), row('B'), row('C'), row('D'), row('E')], '2026-10-20').done, [true, true, false, true, false]);
+});
+
+test('the meal kinds are Breakfast, Lunch, Pre-training, Dinner and Snack', () => {
+  equal(MEAL_SLOTS, ['Breakfast', 'Lunch', 'Pre-training', 'Dinner', 'Snack']);
+});
+
+test('Pre-training without a time sits between Lunch and Dinner', () => {
+  const all = [meal('s', 1, 'Snack'), meal('d', 1, 'Dinner'), meal('p', 1, 'Pre-training'), meal('l', 1, 'Lunch'), meal('b', 1, 'Breakfast')];
+  equal(mealsOn(all, 1).map((m) => m.name), ['Breakfast', 'Lunch', 'Pre-training', 'Dinner', 'Snack']);
+});
+
+// ---------- saved weekly meal plans ----------
+const planOf = (name, meals = []) => ({ id: name, name, savedAt: '2026-10-19T12:00:00.000Z', meals });
+
+test('defaultPlanName uses the Monday of this week and avoids names already taken', () => {
+  equal(defaultPlanName(new Date(2026, 9, 21), []), 'Week of Oct 19');
+  equal(defaultPlanName(new Date(2026, 9, 19), []), 'Week of Oct 19');
+  equal(defaultPlanName(new Date(2026, 9, 25), []), 'Week of Oct 19');
+  equal(defaultPlanName(new Date(2026, 9, 26), []), 'Week of Oct 26');
+  equal(defaultPlanName(new Date(2026, 9, 21), [planOf('Week of Oct 19')]), 'Week of Oct 19 (2)');
+  equal(defaultPlanName(new Date(2026, 9, 21), [planOf('week of oct 19'), planOf('Week of Oct 19 (2)')]), 'Week of Oct 19 (3)');
+  equal(defaultPlanName(new Date(2026, 10, 2), []), 'Week of Nov 2');
+});
+
+test('validatePlanName needs a new name of a sensible length', () => {
+  equal(validatePlanName('Cutting week', []), null);
+  equal(validatePlanName('  ', []) !== null, true);
+  equal(validatePlanName('x'.repeat(61), []) !== null, true);
+  equal(validatePlanName('cutting WEEK', [planOf('Cutting week')]) !== null, true);
+  equal(validatePlanName('New', Array.from({ length: 30 }, (_, i) => planOf('Plan ' + i))) !== null, true);
+});
+
+test('snapshotPlan keeps every meal and day order but unticks prepped and drops ids', () => {
+  const all = [meal('a', 1, 'Breakfast', { desc: 'oats', time: '07:00', kcal: 500, prepped: true, rank: 10, groupId: 'g' }), meal('b', 3, 'Lunch', { prepped: true })];
+  const plan = snapshotPlan(all, '  Plan A  ', '2026-10-19T12:00:00.000Z', () => 'p1');
+  equal(plan.name, 'Plan A');
+  equal(plan.id, 'p1');
+  equal(plan.meals.map((m) => m.prepped), [false, false]);
+  equal(plan.meals[0], { name: 'Breakfast', desc: 'oats', time: '07:00', kcal: 500, protein: null, carb: null, fat: null, day: 1, prepped: false, rank: 10, groupId: 'g' });
+  equal(plan.meals[1].id, undefined);
+  equal(all[0].prepped, true);
+});
+
+test('mealsFromPlan gives every meal a new id and leaves them unprepped', () => {
+  let n = 0;
+  const plan = snapshotPlan([meal('a', 1, 'Breakfast'), meal('b', 2, 'Lunch')], 'P', 'x', () => 'p');
+  const loaded = mealsFromPlan(plan, () => 'id' + ++n);
+  equal(loaded.map((m) => [m.id, m.name, m.day, m.prepped]), [['id1', 'Breakfast', 1, false], ['id2', 'Lunch', 2, false]]);
+});
+
+test('planSummary counts meals and days', () => {
+  equal(planSummary(planOf('P', [meal('a', 1, 'A'), meal('b', 1, 'B'), meal('c', 3, 'C')])), '3 meals on 2 days');
+  equal(planSummary(planOf('P', [meal('a', 1, 'A')])), '1 meal on 1 day');
 });
 
 const failures = results.filter((r) => r.error);

@@ -125,6 +125,10 @@
         <span class="goal-hidden-note" id="goalHiddenNote"></span>
       </div>
       <div class="goal-board" id="goalBoard"></div>
+      <details class="goal-archive" id="goalArchive">
+        <summary id="goalArchiveSummary">Archive</summary>
+        <div class="archive-list" id="archiveList"></div>
+      </details>
     </section>
 
     <section id="journalPage" class="card" aria-label="Journal" hidden>
@@ -216,7 +220,13 @@
         </section>
       </div>
       <section class="card" aria-label="Weekly meal plan">
-        <h2>Weekly meal plan</h2>
+        <div class="calendar-head plan-head">
+          <h2>Weekly meal plan</h2>
+          <div class="plan-actions">
+            <button class="btn ghost" id="loadPlanBtn" type="button">Load saved meal plan</button>
+            <button class="btn" id="savePlanBtn" type="button">Save weekly meal plan</button>
+          </div>
+        </div>
         <p class="hint">Plan the meals for each day. The plan repeats every week. Tap a meal to edit or copy it, or tick it once it's prepped.</p>
         <p class="status" id="mealStatus" role="status"></p>
         <div class="meal-scroll"><div class="meal-grid" id="mealGrid"></div></div>
@@ -430,7 +440,7 @@
     <p class="series-note" id="mealLinkedNote" hidden></p>
     <form id="mealForm" novalidate>
       <label class="field">Meal
-        <input type="text" id="mName" maxlength="60" placeholder="e.g. Breakfast, Pre-training, Dinner">
+        <select id="mName"></select>
       </label>
       <label class="field">What's in it?
         <textarea id="mDesc" maxlength="300" placeholder="e.g. Oats with banana and peanut butter"></textarea>
@@ -483,6 +493,34 @@
       <button class="btn ghost" id="linkedMealOne" type="button">Just this one</button>
       <button class="btn" id="linkedMealAll" type="button">All days</button>
     </div>
+  </dialog>
+
+  <dialog id="savePlanDialog" aria-labelledby="savePlanTitle">
+    <div class="dialog-head">
+      <h2 id="savePlanTitle">Save weekly meal plan</h2>
+      <button class="icon-btn" id="savePlanClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="savePlanForm" novalidate>
+      <p class="tracker-help">Saves every meal in this week so you can load it again later. Nothing is saved as prepped.</p>
+      <label class="field">Plan name
+        <input type="text" id="planName" maxlength="60">
+      </label>
+      <p class="series-note" id="savePlanSummary"></p>
+      <p class="form-error" id="savePlanError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn ghost" id="savePlanCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Save plan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="loadPlanDialog" aria-labelledby="loadPlanTitle">
+    <div class="dialog-head">
+      <h2 id="loadPlanTitle">Load saved meal plan</h2>
+      <button class="icon-btn" id="loadPlanClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p class="tracker-help" id="loadPlanHelp">Loading a plan replaces the meals in this week. Save your current plan first if you want to keep it.</p>
+    <ul class="plan-list" id="planList"></ul>
   </dialog>
 
   <dialog id="copyDialog" aria-labelledby="copyTitle">
