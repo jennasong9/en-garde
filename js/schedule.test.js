@@ -2,6 +2,7 @@ import { parseFencerLink } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import {
   STARTER_ROUTINES,
+  finishedRoutine,
   normalizeSteps,
   reconcileDone,
   routineProgress,
@@ -319,6 +320,13 @@ test('glassesToday only counts glasses logged on the same date', () => {
   equal(glassesToday({ date: '2026-10-13', glasses: 5 }, '2026-10-13'), 5);
   equal(glassesToday({ date: '2026-10-12', glasses: 5 }, '2026-10-13'), 0);
   equal(glassesToday({ date: '', glasses: 0 }, '2026-10-13'), 0);
+});
+
+test('finishedRoutine is true only for the tick that completes every step', () => {
+  equal(finishedRoutine({ done: 2, total: 3 }, { done: 3, total: 3 }), true);
+  equal(finishedRoutine({ done: 1, total: 3 }, { done: 2, total: 3 }), false);
+  equal(finishedRoutine({ done: 3, total: 3 }, { done: 2, total: 3 }), false);
+  equal(finishedRoutine({ done: 0, total: 0 }, { done: 0, total: 0 }), false);
 });
 
 test('allPrepped is true only for a day that has meals and all are prepped', () => {

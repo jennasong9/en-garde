@@ -1,7 +1,9 @@
+import { burstConfetti } from './confetti.js';
 import { $, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import {
   MAX_STEPS,
   STARTER_ROUTINES,
+  finishedRoutine,
   normalizeSteps,
   reconcileDone,
   routineProgress,
@@ -121,10 +123,13 @@ function renderDetail() {
     const box = el('input', { type: 'checkbox', 'data-index': String(index) });
     box.checked = done[index];
     box.addEventListener('change', () => {
+      const before = routineProgress(routine, toIso(new Date()));
+      const spot = box.getBoundingClientRect();
       Object.assign(routine, toggleStep(routine, index, toIso(new Date())));
       persist();
       renderRoutines();
       $('#routineDetail').querySelector('input[data-index="' + index + '"]')?.focus();
+      if (finishedRoutine(before, routineProgress(routine, toIso(new Date())))) burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
     });
     const text = el('span', { class: 'routine-step-text' }, el('b', { text: step.name }));
     if (step.desc) text.append(' — ' + step.desc);

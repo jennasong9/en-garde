@@ -1,3 +1,4 @@
+import { burstConfetti } from './confetti.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import { initFencerLinks } from './fencer-links.js';
 import { renderGoals } from './goals-page.js';
@@ -592,9 +593,11 @@ function sessionCard(session) {
   doneBox.checked = session.done;
   doneBox.addEventListener('change', () => {
     session.done = doneBox.checked;
+    const spot = doneBox.getBoundingClientRect();
     persist();
     renderAll();
     renderDay();
+    if (session.done) burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
   });
 
   const card = el('div', { class: 'session-card type-' + session.type + (session.done ? ' done' : '') },

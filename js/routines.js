@@ -78,6 +78,11 @@ export function routineProgress(routine, todayIso) {
   return { done, total, fraction: total === 0 ? 0 : done / total };
 }
 
+// True when a tick takes a routine (with at least one step) from unfinished to every step done.
+export function finishedRoutine(before, after) {
+  return after.total > 0 && before.done < before.total && after.done === after.total;
+}
+
 // The routine's check marks after the step at `index` is ticked or unticked today.
 export function toggleStep(routine, index, todayIso) {
   const done = stepsDone(routine, todayIso);

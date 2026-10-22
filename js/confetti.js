@@ -8,8 +8,15 @@ export function burstConfetti(x, y) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const layer = document.createElement('div');
   layer.setAttribute('aria-hidden', 'true');
-  layer.style.cssText = 'position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 1000;';
+  layer.style.cssText = 'position: fixed; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0;'
+    + ' background: none; pointer-events: none; overflow: hidden; z-index: 1000;';
   document.body.append(layer);
+  // A pop-up (<dialog>) sits in the browser's top layer above everything, so the confetti joins the
+  // top layer too (added later, so it lands in front of the pop-up).
+  if (layer.showPopover) {
+    layer.popover = 'manual';
+    layer.showPopover();
+  }
 
   const animations = Array.from({ length: PIECES }, () => {
     const piece = document.createElement('i');
