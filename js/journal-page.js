@@ -1,3 +1,4 @@
+import { setSwitchButtons } from './pill.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import { FEELINGS, PROMPTS, SORT_OPTIONS, appendPrompt, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import { parseIso, shiftAnchor, toIso } from './schedule.js';
@@ -64,7 +65,7 @@ export function renderJournal() {
 
 function renderViewSwitch() {
   const names = { calendar: 'Calendar', list: 'List' };
-  $('#journalViewSwitch').replaceChildren(...Object.entries(names).map(([name, label]) => el('button', {
+  setSwitchButtons($('#journalViewSwitch'), Object.entries(names).map(([name, label]) => el('button', {
     class: 'view-btn',
     type: 'button',
     text: label,
@@ -73,7 +74,7 @@ function renderViewSwitch() {
       view = name;
       renderJournal();
     },
-  })));
+  })), '[aria-pressed="true"]');
 }
 
 function renderFeelingFilters() {

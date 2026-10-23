@@ -1,5 +1,6 @@
 import { burstConfetti } from './confetti.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
+import { setSwitchButtons, updateSwitch } from './pill.js';
 import { currentFencerLink, disconnectFencerLink, initFencerLinks, saveFencerLink } from './fencer-links.js';
 import { renderGoals } from './goals-page.js';
 import { renderHydration } from './hydration.js';
@@ -190,7 +191,7 @@ function calendarTitle() {
 }
 
 function renderViewSwitch() {
-  $('#viewSwitch').replaceChildren(...VIEWS.map((name) => el('button', {
+  setSwitchButtons($('#viewSwitch'), VIEWS.map((name) => el('button', {
     class: 'view-btn',
     type: 'button',
     text: VIEW_NAMES[name],
@@ -200,7 +201,7 @@ function renderViewSwitch() {
       renderViewSwitch();
       renderCalendar();
     },
-  })));
+  })), '[aria-pressed="true"]');
   const unit = { month: 'month', week: 'week', '3day': '3 days', day: 'day' }[view];
   $('#prevBtn').setAttribute('aria-label', 'Previous ' + unit);
   $('#nextBtn').setAttribute('aria-label', 'Next ' + unit);
@@ -1103,6 +1104,7 @@ function showPage() {
     $('#' + name + 'Page').hidden = name !== page;
     $('#nav' + capitalized).setAttribute('aria-current', name === page ? 'page' : 'false');
   }
+  updateSwitch($('.page-nav'), '[aria-current="page"]');
   renderNextMeals();
   if (page === 'nutrition') {
     renderNutrition();

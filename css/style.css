@@ -360,6 +360,13 @@ textarea { min-height: 76px; resize: vertical; }
 .view-btn { min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: var(--text-dim); font: inherit; font-weight: 500; cursor: pointer; }
 .view-btn:hover { color: var(--sage-deep); }
 .view-btn[aria-pressed="true"] { background: var(--sage-deep); color: var(--on-accent); }
+/* Toggles with a sliding pill (see js/pill.js): the pill is the green, the buttons sit on top. */
+.has-pill { position: relative; }
+.has-pill > .view-btn, .has-pill > .page-link { position: relative; z-index: 1; transition: color .2s ease; }
+.has-pill > .view-btn[aria-pressed="true"], .has-pill > .page-link[aria-current="page"] { background: none; }
+.pill { position: absolute; top: 0; left: 0; border-radius: 999px; background: var(--sage-deep); pointer-events: none; z-index: 0; transition: transform .3s cubic-bezier(.4, 0, .2, 1), width .3s cubic-bezier(.4, 0, .2, 1), height .3s ease, opacity .15s ease; }
+.pill.no-anim { transition: none; }
+@media (prefers-reduced-motion: reduce) { .pill, .has-pill > .view-btn, .has-pill > .page-link { transition: none; } }
 
 /* ===== Time grid (day, 3-day, week) ===== */
 .tg-scroll { overflow: auto; touch-action: pan-x pan-y; overscroll-behavior: contain; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--radius-s); }
