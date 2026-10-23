@@ -6,6 +6,7 @@ export const SESSION_TYPES = {
   bout: { label: 'Bouting', short: 'Bouting' },
   strength: { label: 'Strength & conditioning', short: 'Strength' },
   rest: { label: 'Rest & mobility', short: 'Rest' },
+  tournament: { label: 'Tournament', short: 'Tournament' },
   other: { label: 'Other', short: 'Other' },
 };
 
@@ -207,6 +208,14 @@ export function hourRange(layouts) {
     endHour = Math.max(endHour, Math.ceil(item.end / 60));
   }
   return { startHour, endHour };
+}
+
+// The scroll position that keeps the same time of day under the pinch point when the hours change
+// from `oldPx` to `newPx` tall. `focalOffset` is how far down the scroll box the pinch is, and
+// `headerHeight` is the sticky day-name row above the hours.
+export function scrollAfterZoom(scrollTop, focalOffset, headerHeight, oldPx, newPx) {
+  const hoursUnderFocus = (scrollTop + focalOffset - headerHeight) / oldPx;
+  return hoursUnderFocus * newPx + headerHeight - focalOffset;
 }
 
 // ---------- moving a session within its day ----------

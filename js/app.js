@@ -23,6 +23,7 @@ import {
   makeId,
   minutesToTime,
   moveStart,
+  scrollAfterZoom,
   nextSessions,
   parseIso,
   sessionsOn,
@@ -49,7 +50,12 @@ let profile = { ...DEFAULT_PROFILE, ...loadJson('profile', {}) };
 const VIEW_NAMES = { month: 'Month', week: 'Week', '3day': '3 Day', day: 'Day' };
 // Phones get taller hours so a short session has room to wrap its details onto a second line.
 const phoneScreen = window.matchMedia('(max-width: 640px)');
-const hourHeight = () => (phoneScreen.matches ? 64 : 52);
+const defaultHourHeight = () => (phoneScreen.matches ? 64 : 52);
+// How tall one hour is in the Week, 3 Day and Day views. Pinching changes it, and it is remembered.
+const MIN_HOUR_HEIGHT = 28;
+const MAX_HOUR_HEIGHT = 140;
+const savedHourHeight = loadJson('calendarHourHeight', null);
+let calendarHourPx = Number.isFinite(savedHourHeight) ? clampHourHeight(savedHourHeight) : defaultHourHeight();
 let view = phoneScreen.matches ? '3day' : 'month';
 let anchorIso = toIso(new Date());
 
@@ -202,10 +208,31 @@ function renderViewSwitch() {
 
 function renderCalendar() {
   $('#calendarTitle').textContent = calendarTitle();
+  // Give the time views their height before the Month view is hidden. Otherwise the page is
+  // briefly shorter, and the browser throws away how far down the page you had scrolled.
+  if (view !== 'month') fitTimeViewToMonth();
   $('#monthView').hidden = view !== 'month';
   $('#timeView').hidden = view === 'month';
   if (view === 'month') renderMonth();
   else renderTimeGrid();
+}
+
+function clampHourHeight(px) {
+  return Math.max(MIN_HOUR_HEIGHT, Math.min(MAX_HOUR_HEIGHT, px));
+}
+
+// The Week, 3 Day and Day views are exactly as tall as the Month view (so the page does not jump
+// when switching) and scroll inside that height. The Month view is measured for the month being shown.
+function fitTimeViewToMonth() {
+  const monthView = $('#monthView');
+  const wasHidden = monthView.hidden;
+  if (wasHidden) {
+    renderMonth();
+    monthView.hidden = false;
+  }
+  const height = monthView.getBoundingClientRect().height;
+  if (wasHidden) monthView.hidden = true;
+  $('#timeView').style.height = height + 'px';
 }
 
 function renderMonth() {
@@ -257,12 +284,19 @@ function renderTimeGrid() {
   const layouts = days.map((iso) => layoutDay(sessionsOn(byDate.get(iso) || [], iso)));
   const { startHour, endHour } = hourRange(layouts.flat());
   const hours = endHour - startHour;
-  const hourPx = hourHeight();
+  const scroller = $('#timeView');
+  const previousScroll = scroller.scrollTop;
+  const viewKey = view + '|' + anchorIso;
+  const sameView = viewKey === shownTimeView;
+  shownTimeView = viewKey;
+  fitTimeViewToMonth();
 
   const grid = el('div', { class: 'tg' });
   grid.style.setProperty('--cols', String(days.length));
   grid.style.setProperty('--hours', String(hours));
-  grid.style.setProperty('--hour-h', hourPx + 'px');
+  grid.style.setProperty('--hour-h', calendarHourPx + 'px');
+  // Everything in the grid is placed in "hours" of --hour-h, so zooming only changes that one value.
+  const atHour = (hoursFromTop) => 'calc(var(--hour-h) * ' + hoursFromTop + ')';
 
   const head = el('div', { class: 'tg-row tg-head' }, el('div'));
   const anytime = el('div', { class: 'tg-row tg-anytime' }, el('div', { class: 'tg-anytime-label', text: 'Any time' }));
@@ -270,7 +304,7 @@ function renderTimeGrid() {
   const gutter = el('div', { class: 'tg-gutter' });
   for (let hour = startHour; hour < endHour; hour++) {
     const label = el('span', { class: 'tg-hour-label', text: hourLabel(hour) });
-    label.style.top = (hour - startHour) * hourPx + 'px';
+    label.style.top = atHour(hour - startHour);
     if (hour === startHour) label.classList.add('first');
     gutter.append(label);
   }
@@ -291,27 +325,114 @@ function renderTimeGrid() {
 
     const column = el('div', { class: 'tg-col' });
     column.addEventListener('click', (event) => {
-      const hour = startHour + Math.floor((event.clientY - column.getBoundingClientRect().top) / hourPx);
+      const hour = startHour + Math.floor((event.clientY - column.getBoundingClientRect().top) / calendarHourPx);
       openDay(iso, String(Math.min(hour, endHour - 1)).padStart(2, '0') + ':00');
     });
-    for (const item of layouts[index]) column.append(sessionBlock(item, iso, { startHour, endHour, hourPx }));
+    for (const item of layouts[index]) column.append(sessionBlock(item, iso, { startHour, endHour }));
     if (iso === todayIso) {
       const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
       if (nowMinutes >= startHour * 60 && nowMinutes < endHour * 60) {
         const line = el('div', { class: 'now-line' });
-        line.style.top = ((nowMinutes - startHour * 60) / 60) * hourPx + 'px';
+        line.style.top = atHour((nowMinutes - startHour * 60) / 60);
         column.append(line);
       }
     }
     body.append(column);
   });
 
-  const rows = [head];
+  // The day names (and the "Any time" strip) stay at the top while the hours scroll under them.
+  const top = el('div', { class: 'tg-top' }, head);
   const hasUntimed = days.some((iso) => (byDate.get(iso) || []).some((s) => !s.time));
-  if (hasUntimed) rows.push(anytime);
-  grid.append(...rows, body);
-  $('#timeView').replaceChildren(grid);
+  if (hasUntimed) top.append(anytime);
+  grid.append(top, body);
+  scroller.replaceChildren(grid);
+  setHourHeight(calendarHourPx, scroller.getBoundingClientRect().top);
+  if (sameView) scroller.scrollTop = previousScroll;
+  else scroller.scrollTop = firstScrollPosition(days, layouts, startHour);
 }
+
+// The view that was last drawn, so a redraw of the same days keeps where you had scrolled to.
+let shownTimeView = '';
+
+// Where a freshly opened Week, 3 Day or Day view starts: around the current time if today is
+// showing, otherwise at the earliest session, otherwise at the top.
+function firstScrollPosition(days, layouts, startHour) {
+  const now = new Date();
+  let minutes = null;
+  if (days.includes(toIso(now))) minutes = now.getHours() * 60 + now.getMinutes();
+  else {
+    const starts = layouts.flat().map((item) => item.start);
+    if (starts.length > 0) minutes = Math.min(...starts);
+  }
+  if (minutes === null) return 0;
+  const hoursFromTop = Math.max(0, (minutes - startHour * 60) / 60 - 1);
+  return hoursFromTop * calendarHourPx;
+}
+
+// Zooms the time views to `px` per hour. `focalY` is the screen height of the pinch (or pointer),
+// and the scroll position is adjusted so the time under it stays put.
+function setHourHeight(px, focalY) {
+  const scroller = $('#timeView');
+  const grid = scroller.querySelector('.tg');
+  if (!grid) return;
+  const headerHeight = scroller.querySelector('.tg-top').offsetHeight;
+  // Zooming out stops once the day just fills the box, so there is never an empty gap below it.
+  const hoursShown = Number(grid.style.getPropertyValue('--hours'));
+  const fillHeight = (scroller.clientHeight - headerHeight) / hoursShown;
+  const next = Math.max(clampHourHeight(px), Math.min(fillHeight, MAX_HOUR_HEIGHT));
+  if (next === calendarHourPx) return;
+  const focalOffset = focalY - scroller.getBoundingClientRect().top;
+  const scrollTop = scrollAfterZoom(scroller.scrollTop, focalOffset, headerHeight, calendarHourPx, next);
+  calendarHourPx = next;
+  grid.style.setProperty('--hour-h', next + 'px');
+  scroller.scrollTop = scrollTop;
+  saveJson('calendarHourHeight', next);
+}
+
+// Pinching (two fingers on a phone, a two-finger pinch on a trackpad) zooms the hours in and out.
+(function enablePinchZoom() {
+  const scroller = $('#timeView');
+  // A trackpad pinch arrives as a wheel event with ctrlKey set (Chrome, Edge, Firefox).
+  scroller.addEventListener('wheel', (event) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    setHourHeight(calendarHourPx * Math.exp(-event.deltaY * 0.01), event.clientY);
+  }, { passive: false });
+
+  // Safari reports a trackpad pinch as gesture events instead.
+  let gestureStart = calendarHourPx;
+  scroller.addEventListener('gesturestart', (event) => {
+    event.preventDefault();
+    gestureStart = calendarHourPx;
+  });
+  scroller.addEventListener('gesturechange', (event) => {
+    event.preventDefault();
+    setHourHeight(gestureStart * event.scale, event.clientY);
+  });
+
+  // Two fingers on a touch screen.
+  let pinch = null;
+  const spread = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+  scroller.addEventListener('touchstart', (event) => {
+    if (event.touches.length === 2) pinch = { spread: spread(event.touches), px: calendarHourPx };
+  }, { passive: true });
+  scroller.addEventListener('touchmove', (event) => {
+    if (!pinch || event.touches.length !== 2) return;
+    event.preventDefault();
+    const middleY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+    setHourHeight(pinch.px * (spread(event.touches) / pinch.spread), middleY);
+  }, { passive: false });
+  const endPinch = (event) => {
+    if (event.touches.length < 2) pinch = null;
+  };
+  scroller.addEventListener('touchend', endPinch);
+  scroller.addEventListener('touchcancel', endPinch);
+})();
+
+// The Month view's height changes with the window, so the other views follow it.
+window.addEventListener('resize', () => {
+  if (view !== 'month') fitTimeViewToMonth();
+});
 
 // Sessions shorter than this put their time and length beside the type instead of stacked
 // under it (a stacked second line would be cut off). In a column too narrow for both, the
@@ -319,7 +440,7 @@ function renderTimeGrid() {
 const COMPACT_BLOCK_MINUTES = 45;
 
 function sessionBlock(item, iso, bounds) {
-  const { startHour, hourPx } = bounds;
+  const { startHour } = bounds;
   const { session } = item;
   const minutes = item.end - item.start;
   const compact = minutes < COMPACT_BLOCK_MINUTES;
@@ -337,10 +458,10 @@ function sessionBlock(item, iso, bounds) {
   }, el('b', { text: typeName }), ' ', timeLabel);
   if (session.location && minutes >= 60) block.append(el('span', { class: 'tg-sub', text: session.location }));
   const positionAt = (start) => {
-    block.style.top = ((start - startHour * 60) / 60) * hourPx + 'px';
+    block.style.top = 'calc(var(--hour-h) * ' + (start - startHour * 60) / 60 + ')';
   };
   positionAt(item.start);
-  block.style.height = Math.max((minutes / 60) * hourPx - 2, 20) + 'px';
+  block.style.height = 'max(calc(var(--hour-h) * ' + minutes / 60 + ' - 2px), 20px)';
   block.style.left = 'calc(' + (item.lane / item.lanes) * 100 + '% + 2px)';
   block.style.width = 'calc(' + 100 / item.lanes + '% - 4px)';
 
@@ -388,15 +509,14 @@ function focusSession(id) {
 // keys move it too. `hooks.preview(start)` shows the block at a new start while dragging, and
 // `hooks.finished(newStart)` runs on release (newStart is null if it did not move).
 function enableMoveWithinDay(block, item, bounds, hooks) {
-  const { startHour, endHour, hourPx } = bounds;
+  const { startHour, endHour } = bounds;
   const duration = item.end - item.start;
-  const minutesPerPixel = 60 / hourPx;
   const moveBy = (delta) => moveStart(item.start, delta, duration, startHour * 60, endHour * 60);
   let latest = item.start;
 
   makeDraggable(block, {
     move: (event, dx, dy) => {
-      latest = moveBy(dy * minutesPerPixel);
+      latest = moveBy((dy * 60) / calendarHourPx);
       hooks.preview(latest);
     },
     drop: () => {
@@ -661,7 +781,7 @@ function deleteSessions(matches, message) {
 // ---------- session form ----------
 const typeSelect = $('#fType');
 for (const [type, info] of Object.entries(SESSION_TYPES)) {
-  typeSelect.append(el('option', { value: type, text: info.label }));
+  typeSelect.append(el('option', { value: type, text: info.short }));
 }
 
 const dayChips = $('#dayChips');

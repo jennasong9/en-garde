@@ -128,10 +128,12 @@
         <span class="goal-hidden-note" id="goalHiddenNote"></span>
       </div>
       <div class="goal-board" id="goalBoard"></div>
-      <details class="goal-archive" id="goalArchive">
-        <summary id="goalArchiveSummary">Archive</summary>
-        <div class="archive-list" id="archiveList"></div>
-      </details>
+      <section class="goal-archive collapsed" id="goalArchive" aria-label="Archive">
+        <button class="meal-day-toggle archive-toggle" id="goalArchiveToggle" type="button" aria-expanded="false">
+          <span id="goalArchiveSummary">Archive</span><span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div class="fold"><div class="fold-inner"><div class="archive-list" id="archiveList"></div></div></div>
+      </section>
     </section>
 
     <section id="journalPage" class="card" aria-label="Journal" hidden>

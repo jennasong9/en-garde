@@ -1,4 +1,5 @@
 import { burstConfetti } from './confetti.js';
+import { foldBody, setFolded } from './fold.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import {
   DAY_NAMES,
@@ -42,7 +43,7 @@ let meals = Array.isArray(stored) ? stored : [];
 const storedHistory = loadJson('mealHistory', []);
 let history = mergeIntoHistory(Array.isArray(storedHistory) ? storedHistory : [], meals);
 let historyQuery = '';
-// When on, the History column stays but its list is folded away.
+// When on, the History column stays but only its title and summary show.
 let historyHidden = loadJson('mealHistoryHidden', false) === true;
 
 // The meal plan lists the week Monday to Sunday (day numbers use 0 = Sunday, like the calendar).
@@ -68,6 +69,19 @@ function remember(meal) {
   history = addToHistory(history, meal);
 }
 
+// Days whose meals are folded away (just the name and summary show). Remembered on this device.
+const storedCollapsed = loadJson('mealDaysCollapsed', []);
+const collapsedDays = new Set(Array.isArray(storedCollapsed) ? storedCollapsed.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) : []);
+
+// Folds or opens one day in place, so it slides instead of redrawing.
+function toggleDay(day, column, toggle) {
+  const folding = !collapsedDays.has(day);
+  if (folding) collapsedDays.add(day);
+  else collapsedDays.delete(day);
+  saveJson('mealDaysCollapsed', [...collapsedDays]);
+  setFolded(column, toggle, folding);
+}
+
 export function renderNutrition() {
   renderNextMeals();
   renderMacroTargets();
@@ -83,11 +97,18 @@ function dayColumn(name, day, isToday) {
     : [totals.kcal ? totals.kcal.toLocaleString() + ' kcal' : '', totals.prepped + '/' + totals.count + ' prepped']
       .filter(Boolean).join(' · ');
 
-  const head = el('div', { class: 'meal-day-head' },
-    el('h3', { text: name }),
-    el('span', { class: 'meal-day-summary', text: summary }));
+  const collapsed = collapsedDays.has(day);
+  const toggle = el('button', {
+    class: 'meal-day-toggle',
+    type: 'button',
+    'aria-expanded': String(!collapsed),
+    'aria-label': name + "'s meals",
+    onclick: () => toggleDay(day, column, toggle),
+  }, el('h3', { text: name }), el('span', { class: 'chevron', 'aria-hidden': 'true' }));
+  const head = el('div', { class: 'meal-day-head' }, toggle, el('span', { class: 'meal-day-summary', text: summary }));
+  const links = el('div', { class: 'meal-day-links' });
   if (totals.count > 0) {
-    head.append(el('button', {
+    links.append(el('button', {
       class: 'link-btn small',
       type: 'button',
       text: 'Copy to other days',
@@ -96,7 +117,7 @@ function dayColumn(name, day, isToday) {
   }
 
   if (hasCustomOrder(meals, day)) {
-    head.append(el('button', {
+    links.append(el('button', {
       class: 'link-btn small',
       type: 'button',
       text: 'Reset order',
@@ -110,16 +131,16 @@ function dayColumn(name, day, isToday) {
     }));
   }
 
-  const column = el('section', { class: 'meal-day' + (isToday ? ' today' : ''), 'aria-label': name, 'data-day': String(day) }, head);
-  if (totals.count > 0) column.append(...macroRows(day));
-  for (const meal of dayMeals) column.append(mealCard(meal));
-  column.append(el('button', {
+  const addMeal = el('button', {
     class: 'btn ghost small add-meal',
     type: 'button',
     text: '+ Add meal',
     'aria-label': 'Add a meal on ' + name,
     onclick: () => openMealForm(null, day),
-  }));
+  });
+  const column = el('section', { class: 'meal-day' + (isToday ? ' today' : '') + (collapsed ? ' collapsed' : ''), 'aria-label': name, 'data-day': String(day) },
+    head,
+    foldBody(links, ...(totals.count > 0 ? macroRows(day) : []), ...dayMeals.map(mealCard), addMeal));
   return column;
 }
 
@@ -335,25 +356,24 @@ function moveMealToDay(meal, day, keepFocus = false) {
 // ---------- history of meals added before ----------
 function historyPanel() {
   const toggle = el('button', {
-    class: 'link-btn small',
+    class: 'meal-day-toggle',
     type: 'button',
-    text: historyHidden ? 'Show history' : 'Hide history',
     'aria-expanded': String(!historyHidden),
+    'aria-label': 'Meal history',
     onclick: () => {
       historyHidden = !historyHidden;
       saveJson('mealHistoryHidden', historyHidden);
-      renderNutrition();
+      summaryLine.textContent = historySummary();
+      setFolded(panel, toggle, historyHidden);
     },
-  });
-  let summary = 'Drag a meal onto a day, or tap one to choose days.';
-  if (historyHidden) summary = history.length === 0 ? 'Hidden.' : 'Hidden. ' + history.length + (history.length === 1 ? ' meal is' : ' meals are') + ' saved.';
-  else if (history.length === 0) summary = 'Meals you add will show up here.';
-  const head = el('div', { class: 'meal-day-head' },
-    el('h3', { text: 'History' }),
-    el('span', { class: 'meal-day-summary', text: summary }),
-    toggle);
-  const panel = el('section', { class: 'meal-day meal-history' + (historyHidden ? ' folded' : ''), 'aria-label': 'History of past meals' }, head);
-  if (historyHidden) return panel;
+  }, el('h3', { text: 'History' }), el('span', { class: 'chevron', 'aria-hidden': 'true' }));
+  const historySummary = () => {
+    if (history.length === 0) return 'Meals you add will show up here.';
+    if (historyHidden) return history.length + (history.length === 1 ? ' meal saved' : ' meals saved');
+    return 'Drag a meal onto a day, or tap one to choose days.';
+  };
+  const summaryLine = el('span', { class: 'meal-day-summary', text: historySummary() });
+  const head = el('div', { class: 'meal-day-head' }, toggle, summaryLine);
 
   const search = el('input', {
     type: 'search',
@@ -371,8 +391,9 @@ function historyPanel() {
     draw();
   });
   draw();
-  if (history.length > 5) panel.append(search);
-  panel.append(list);
+  const panel = el('section', { class: 'meal-day meal-history' + (historyHidden ? ' collapsed' : ''), 'aria-label': 'History of past meals' },
+    head,
+    foldBody(...(history.length > 5 ? [search] : []), list));
   return panel;
 }
 

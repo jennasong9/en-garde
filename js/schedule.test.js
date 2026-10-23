@@ -58,6 +58,8 @@ import {
   nextSessions,
   sessionsOn,
   sessionsThisWeek,
+  SESSION_TYPES,
+  scrollAfterZoom,
   shiftAnchor,
   validateRepeat,
   visibleDays,
@@ -534,6 +536,28 @@ test('findDuplicates reports every identical session on a day', () => {
 });
 
 // ---------- FencingTracker link ----------
+test('scrollAfterZoom keeps the time under the pinch point in the same place', () => {
+  // 3 hours down in 50px hours, pinching 100px below a 40px header: zooming to 100px hours.
+  const before = { scrollTop: 90, focal: 100, header: 40, oldPx: 50, newPx: 100 };
+  const after = scrollAfterZoom(before.scrollTop, before.focal, before.header, before.oldPx, before.newPx);
+  const hourUnderBefore = (before.scrollTop + before.focal - before.header) / before.oldPx;
+  const hourUnderAfter = (after + before.focal - before.header) / before.newPx;
+  equal(hourUnderAfter, hourUnderBefore);
+  equal(scrollAfterZoom(0, 40, 40, 50, 100), 0);
+});
+
+test('session types are listed in the order Jenna wants, with Other last', () => {
+  equal(Object.keys(SESSION_TYPES), ['footwork', 'blade', 'bout', 'strength', 'rest', 'tournament', 'other']);
+});
+
+test('every session type, including Tournament, has a full and a short name', () => {
+  equal(Object.keys(SESSION_TYPES).includes('tournament'), true);
+  for (const info of Object.values(SESSION_TYPES)) {
+    equal(typeof info.label === 'string' && info.label !== '', true);
+    equal(typeof info.short === 'string' && info.short !== '', true);
+  }
+});
+
 test('normalizeFont keeps the three choices and falls back to sans-serif', () => {
   equal(FONT_CHOICES, ['serif', 'sans', 'mono']);
   equal(normalizeFont('serif'), 'serif');

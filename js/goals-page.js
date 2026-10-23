@@ -1,4 +1,5 @@
 import { $, el, formState, protectUnsavedChanges } from './dom.js';
+import { setFolded } from './fold.js';
 import {
   PROGRESS_STEPS,
   TAGS,
@@ -344,6 +345,11 @@ function openGoalForm(goal) {
 }
 
 $('#addGoalBtn').addEventListener('click', () => openGoalForm(null));
+
+$('#goalArchiveToggle').addEventListener('click', () => {
+  const archive = $('#goalArchive');
+  setFolded(archive, $('#goalArchiveToggle'), !archive.classList.contains('collapsed'));
+});
 
 $('#hideCompleted').addEventListener('change', (event) => {
   hideCompleted = event.target.checked;
