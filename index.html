@@ -6,7 +6,7 @@
   <title>En Garde — Fencing Schedule</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script>
     // Pick the light or dark look before the page is drawn: the saved choice, else the device's.
     (function () {
@@ -16,6 +16,9 @@
         theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
       document.documentElement.setAttribute('data-theme', theme);
+      var font = null;
+      try { font = JSON.parse(localStorage.getItem('engarde_font')); } catch (error) { font = null; }
+      document.documentElement.setAttribute('data-font', font === 'serif' || font === 'mono' ? font : 'sans');
     })();
   </script>
   <link rel="stylesheet" href="css/style.css">
@@ -118,9 +121,9 @@
       <p class="hint">Add a new goal or tap the bars to track your progress.</p>
       <div class="filters goal-filters" id="goalFilters" role="group" aria-label="Filter goals by tag"></div>
       <div class="goal-options">
-        <label class="switch">
-          <input type="checkbox" id="hideCompleted">
+        <label class="switch-row goal-option" for="hideCompleted">
           <span>Hide completed</span>
+          <input type="checkbox" role="switch" id="hideCompleted" class="switch-toggle">
         </label>
         <span class="goal-hidden-note" id="goalHiddenNote"></span>
       </div>
@@ -340,7 +343,7 @@
     <form id="routineForm" novalidate>
       <div class="field-row">
         <label class="field field-wide">Name
-          <input type="text" id="rName" maxlength="60" placeholder="e.g. Warm-up sequence">
+          <input type="text" id="rName" maxlength="60" placeholder="e.g. Warmup">
         </label>
         <label class="field">Minutes
           <input type="number" id="rMins" min="0" max="600" inputmode="numeric" placeholder="15">
@@ -567,6 +570,14 @@
         <span>Dark mode</span>
         <input type="checkbox" role="switch" id="darkModeToggle" class="switch-toggle">
       </label>
+      <div class="font-picker" role="radiogroup" aria-labelledby="fontLabel">
+        <span id="fontLabel">Change font</span>
+        <div class="font-options">
+          <button type="button" role="radio" class="font-option" data-font="serif">Serif</button>
+          <button type="button" role="radio" class="font-option" data-font="sans">Sans-serif</button>
+          <button type="button" role="radio" class="font-option" data-font="mono">Mono</button>
+        </div>
+      </div>
     </section>
 
     <section class="settings-section" aria-labelledby="profileTitle">
@@ -590,6 +601,10 @@
             </select>
           </label>
         </div>
+        <label class="field">FencingTracker profile link
+          <input type="text" id="pTracker" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://fencingtracker.com/p/123456/Your-Name">
+        </label>
+        <button class="btn danger small" id="pTrackerDisconnect" type="button" hidden>Disconnect FencingTracker</button>
         <p class="form-error" id="profileError" role="alert"></p>
         <div class="form-actions">
           <button class="btn ghost" id="cancelProfile" type="button">Close</button>

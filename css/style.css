@@ -79,20 +79,30 @@
   --other: #a597c2;
 }
 
+/* The three typefaces on offer in Settings > Appearance > Change font. */
+:root {
+  --font-body: 'DM Sans', system-ui, sans-serif;
+}
+:root[data-font="serif"] {
+  --font-body: 'Lora', Georgia, 'Times New Roman', serif;
+}
+:root[data-font="mono"] {
+  --font-body: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3 {
-  font-family: 'Fraunces', Georgia, serif;
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.01em;
@@ -206,6 +216,14 @@ textarea { min-height: 76px; resize: vertical; }
 .switch-toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--text-faint); box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .2s ease, background .2s ease; }
 .switch-toggle:checked { background: var(--sage-deep); border-color: var(--sage-deep); }
 .switch-toggle:checked::after { transform: translateX(22px); background: var(--on-accent); }
+.link-arrow { font-family: 'DM Sans', system-ui, sans-serif; }
+.font-picker { padding: 6px 0 2px; font-weight: 500; }
+.font-options { display: flex; gap: 8px; margin-top: 8px; }
+.font-option { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 6px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); color: var(--text); font-size: 14px; cursor: pointer; overflow-wrap: anywhere; }
+.font-option[data-font="sans"] { font-family: 'DM Sans', system-ui, sans-serif; }
+.font-option[data-font="serif"] { font-family: 'Lora', Georgia, 'Times New Roman', serif; }
+.font-option[data-font="mono"] { font-family: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+.font-option[aria-checked="true"] { background: var(--sage-deep); border-color: var(--sage-deep); color: var(--on-accent); }
 .settings-section + .settings-section { padding-top: 14px; border-top: 1px solid var(--border); }
 .settings-section h3 { font-size: 16px; margin-bottom: 8px; }
 .mini-ring { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 2px 10px 2px 2px; border-radius: 999px; color: var(--text-dim); text-decoration: none; }
@@ -248,7 +266,7 @@ textarea { min-height: 76px; resize: vertical; }
 .ring-track { stroke: var(--surface-2); }
 .ring-fill { stroke: var(--sage-deep); stroke-linecap: round; stroke-dasharray: 326.73; stroke-dashoffset: 326.73; transition: stroke-dashoffset .4s ease; }
 .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.ring-count { font-family: 'Fraunces', Georgia, serif; font-size: 32px; font-weight: 600; color: var(--sage-deep); line-height: 1.1; }
+.ring-count { font-size: 32px; font-weight: 600; color: var(--sage-deep); line-height: 1.1; }
 .ring-label { font-size: 12px; color: var(--text-dim); }
 .ring-hours { margin: 0; color: var(--text-dim); }
 .ring-hours b { font-size: 18px; color: var(--text); }
@@ -347,7 +365,7 @@ textarea { min-height: 76px; resize: vertical; }
 .tg-head { border-bottom: 1px solid var(--border); background: var(--surface-2); }
 .tg-day-btn { min-height: 56px; padding: 6px 4px; border: 0; border-left: 1px solid var(--border); background: none; color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
 .tg-day-btn:hover { background: var(--sage-soft); }
-.tg-day-num { font-family: 'Fraunces', Georgia, serif; font-size: 20px; font-weight: 600; color: var(--text); line-height: 1.1; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.tg-day-num { font-size: 20px; font-weight: 600; color: var(--text); line-height: 1.1; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .tg-day-btn.today .tg-day-num { background: var(--sage-deep); color: var(--on-accent); }
 .tg-anytime { border-bottom: 1px solid var(--border); }
 .tg-anytime > * { padding: 6px; min-height: 36px; }
@@ -405,7 +423,7 @@ textarea { min-height: 76px; resize: vertical; }
 /* ===== Routines ===== */
 .routine-layout { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 8px; }
 .routine-side { display: flex; flex-direction: column; gap: 14px; }
-.routine-option { padding: 0 4px; font-size: 14px; }
+.routine-option, .goal-option { padding: 0 4px; font-size: 14px; }
 .routine-list { display: flex; flex-direction: column; gap: 8px; }
 .routine-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .routine-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -503,7 +521,7 @@ textarea { min-height: 76px; resize: vertical; }
 }
 .sticky.complete { opacity: .75; }
 .sticky-tag { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: color-mix(in srgb, var(--pin) 55%, var(--note-text)); }
-.sticky-name { flex: 1; margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 18px; font-weight: 600; line-height: 1.3; color: var(--note-text); overflow-wrap: anywhere; }
+.sticky-name { flex: 1; margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; color: var(--note-text); overflow-wrap: anywhere; }
 .sticky-due { font-size: 12px; color: var(--note-text-dim); }
 .sticky-due .urgent { color: var(--urgent); font-weight: 700; }
 .sticky-stamp { position: absolute; top: 14px; right: 16px; padding: 2px 10px; border: 2px solid var(--sage-deep); border-radius: 999px; color: var(--sage-deep); font-size: 11px; font-weight: 700; transform: rotate(7deg); }
@@ -555,7 +573,7 @@ textarea { min-height: 76px; resize: vertical; }
 }
 .journal-entry { padding: 14px 16px; margin-top: 12px; border: 1px solid var(--border); border-left: 5px solid var(--c); border-radius: var(--radius-s); background: var(--raised); }
 .journal-entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 6px; }
-.journal-entry-date { font-family: 'Fraunces', Georgia, serif; font-size: 18px; font-weight: 600; }
+.journal-entry-date { font-size: 18px; font-weight: 600; }
 .journal-entry-feeling { font-size: 13px; font-weight: 700; color: color-mix(in srgb, var(--c) 65%, var(--mix-text)); }
 .journal-entry-text { margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .journal-entry-text.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
@@ -728,6 +746,8 @@ form h3 { font-size: 17px; }
   .masthead-side { width: 100%; justify-content: flex-start; }
   .page-nav { display: flex; width: 100%; }
   .page-link { flex: 1; justify-content: center; padding: 0 3px; font-size: 13.5px; }
+  /* The mono letters are wider, so the five tabs need smaller type to fit one row. */
+  :root[data-font="mono"] .page-link { font-size: 11px; letter-spacing: -0.02em; }
   .routine-layout { grid-template-columns: minmax(0, 1fr); }
   .nutrition-top { grid-template-columns: 1fr; }
   .macro-target { grid-template-columns: 110px 1fr; }

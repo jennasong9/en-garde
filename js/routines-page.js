@@ -8,6 +8,7 @@ import {
   reconcileDone,
   routineProgress,
   routineSummary,
+  shortStarterName,
   stepsDone,
   toggleStep,
   validateRoutine,
@@ -18,7 +19,10 @@ import { loadJson, saveJson } from './storage.js';
 const stored = loadJson('routines', []);
 let routines = Array.isArray(stored) ? stored : [];
 // Routines saved earlier kept each step as one line of text; they now have a name and a description.
-for (const routine of routines) routine.steps = normalizeSteps(routine.steps);
+for (const routine of routines) {
+  routine.steps = normalizeSteps(routine.steps);
+  routine.name = shortStarterName(routine.name);
+}
 
 const routineDialog = $('#routineDialog');
 // Whether a ticked step gets a line through it (the user can turn this off).

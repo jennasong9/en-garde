@@ -12,7 +12,7 @@ export const MAX_ROUTINE_MINUTES = 600;
 // nothing in them are ignored). Returns { error } or { value: { name, mins, steps } }.
 export function validateRoutine({ name, minsText, steps: rows }) {
   const trimmedName = name.trim();
-  if (trimmedName === '') return { error: 'Give the routine a name, like Warm-up.' };
+  if (trimmedName === '') return { error: 'Give the routine a name, like Warmup.' };
   if (trimmedName.length > MAX_NAME_CHARS) return { error: 'Keep the name under ' + MAX_NAME_CHARS + ' characters.' };
 
   const minutes = minsText.trim();
@@ -99,7 +99,7 @@ export function reconcileDone(routine, newSteps, todayIso) {
 // The routines from the first prototype, offered as a starting point.
 const STARTER_TEXT = [
   {
-    name: 'Warm-up sequence',
+    name: 'Warmup',
     mins: 15,
     steps: [
       'Pulse raise — 3 min light jogging or jump rope.',
@@ -109,7 +109,7 @@ const STARTER_TEXT = [
     ],
   },
   {
-    name: 'Footwork ladder',
+    name: 'Footwork',
     mins: 20,
     steps: [
       'Advance-retreat — 4 lengths, small controlled steps.',
@@ -119,7 +119,7 @@ const STARTER_TEXT = [
     ],
   },
   {
-    name: 'Bladework fundamentals',
+    name: 'Bladework',
     mins: 25,
     steps: [
       'Line work — extend to four lines, partner or wall target.',
@@ -129,7 +129,7 @@ const STARTER_TEXT = [
     ],
   },
   {
-    name: 'Cool-down',
+    name: 'Cooldown',
     mins: 10,
     steps: [
       'Light footwork — easy advance/retreat, heart rate down.',
@@ -141,3 +141,17 @@ const STARTER_TEXT = [
 ];
 
 export const STARTER_ROUTINES = STARTER_TEXT.map((routine) => ({ ...routine, steps: normalizeSteps(routine.steps) }));
+
+// The starter routines used longer names at first. A saved routine still carrying one of those
+// names gets the shorter name; any other name is left alone.
+const OLD_STARTER_NAMES = {
+  'Warm-up sequence': 'Warmup',
+  'Warm-up': 'Warmup',
+  'Footwork ladder': 'Footwork',
+  'Bladework fundamentals': 'Bladework',
+  'Cool-down': 'Cooldown',
+};
+
+export function shortStarterName(name) {
+  return Object.hasOwn(OLD_STARTER_NAMES, name) ? OLD_STARTER_NAMES[name] : name;
+}

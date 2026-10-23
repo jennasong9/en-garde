@@ -1,6 +1,6 @@
 import { burstConfetti } from './confetti.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
-import { initFencerLinks } from './fencer-links.js';
+import { currentFencerLink, disconnectFencerLink, initFencerLinks, saveFencerLink } from './fencer-links.js';
 import { renderGoals } from './goals-page.js';
 import { renderHydration } from './hydration.js';
 import { renderNextMeals } from './next-meals.js';
@@ -8,6 +8,7 @@ import { renderRoutines } from './routines-page.js';
 import { renderJournal } from './journal-page.js';
 import { renderNutrition } from './nutrition.js';
 import { loadJson, saveJson } from './storage.js';
+import { initFont } from './fonts.js';
 import { initTheme } from './theme.js';
 import {
   SESSION_TYPES,
@@ -916,8 +917,17 @@ $('#settingsBtn').addEventListener('click', () => {
   $('#pClub').value = profile.club;
   $('#pRating').value = profile.rating;
   $('#pWeapon').value = profile.weapon;
+  $('#pTracker').value = currentFencerLink();
+  $('#pTrackerDisconnect').hidden = currentFencerLink() === '';
   $('#profileError').textContent = '';
   settingsDialog.showModal();
+  settingsGuard.reset();
+});
+
+$('#pTrackerDisconnect').addEventListener('click', () => {
+  disconnectFencerLink();
+  $('#pTracker').value = '';
+  $('#pTrackerDisconnect').hidden = true;
   settingsGuard.reset();
 });
 
@@ -926,6 +936,11 @@ $('#profileForm').addEventListener('submit', (event) => {
   const name = $('#pName').value.trim();
   if (!name) {
     $('#profileError').textContent = 'Please enter a name.';
+    return;
+  }
+  const linkProblem = saveFencerLink($('#pTracker').value);
+  if (linkProblem) {
+    $('#profileError').textContent = linkProblem;
     return;
   }
   profile = { name, club: $('#pClub').value.trim(), rating: $('#pRating').value.trim(), weapon: $('#pWeapon').value };
@@ -955,6 +970,7 @@ renderAll();
 
 initFencerLinks();
 initTheme();
+initFont();
 
 // ---------- pages ----------
 const PAGES = ['schedule', 'routines', 'nutrition', 'journal', 'goals'];

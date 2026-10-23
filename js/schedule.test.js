@@ -1,4 +1,5 @@
-import { parseFencerLink } from './fencingtracker.js';
+import { FONT_CHOICES, normalizeFont } from './fonts.js';
+import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import {
   STARTER_ROUTINES,
@@ -7,6 +8,7 @@ import {
   reconcileDone,
   routineProgress,
   routineSummary,
+  shortStarterName,
   stepFromText,
   stepsDone,
   toggleStep,
@@ -532,6 +534,20 @@ test('findDuplicates reports every identical session on a day', () => {
 });
 
 // ---------- FencingTracker link ----------
+test('normalizeFont keeps the three choices and falls back to sans-serif', () => {
+  equal(FONT_CHOICES, ['serif', 'sans', 'mono']);
+  equal(normalizeFont('serif'), 'serif');
+  equal(normalizeFont('mono'), 'mono');
+  equal(normalizeFont('comic'), 'sans');
+  equal(normalizeFont(null), 'sans');
+});
+
+test('parseOptionalFencerLink lets the box be empty (no link) but still checks anything typed', () => {
+  equal(parseOptionalFencerLink('   '), { url: '' });
+  equal(parseOptionalFencerLink('fencingtracker.com/p/123456/Jane-Doe').url, 'https://fencingtracker.com/p/123456/Jane-Doe');
+  equal(typeof parseOptionalFencerLink('https://example.com').error, 'string');
+});
+
 test('parseFencerLink accepts a profile link and keeps it as a clean https link', () => {
   equal(parseFencerLink('https://fencingtracker.com/p/123456/Jane-Doe').url, 'https://fencingtracker.com/p/123456/Jane-Doe');
   equal(parseFencerLink('  https://www.fencingtracker.com/p/123456/Jane-Doe  ').url, 'https://www.fencingtracker.com/p/123456/Jane-Doe');
@@ -787,6 +803,15 @@ test('routineSummary gives time and step count, and the starter routines are val
   }
   equal(STARTER_ROUTINES.length, 4);
   equal(STARTER_ROUTINES[0].steps[0], row('Pulse raise', '3 min light jogging or jump rope.'));
+});
+
+test('starter routines are named Warmup, Footwork, Bladework and Cooldown, and old starter names are shortened', () => {
+  equal(STARTER_ROUTINES.map((starter) => starter.name), ['Warmup', 'Footwork', 'Bladework', 'Cooldown']);
+  equal(shortStarterName('Warm-up sequence'), 'Warmup');
+  equal(shortStarterName('Warm-up'), 'Warmup');
+  equal(shortStarterName('Cool-down'), 'Cooldown');
+  equal(shortStarterName('My own routine'), 'My own routine');
+  equal(shortStarterName('toString'), 'toString');
 });
 
 const drill = (extra = {}) => ({ id: 'r', name: 'Warm-up', mins: 10, steps: stepList('A', 'B', 'C', 'D'), ...extra });

@@ -3,6 +3,11 @@
 const HOSTS = ['fencingtracker.com', 'www.fencingtracker.com'];
 const EXAMPLE = 'https://fencingtracker.com/p/123456/Your-Name';
 
+// Like parseFencerLink, but an empty box is fine and means "no link" ({ url: '' }).
+export function parseOptionalFencerLink(text) {
+  return String(text).trim() === '' ? { url: '' } : parseFencerLink(text);
+}
+
 // Turns what the user pasted into a clean profile link, or explains what is wrong.
 // Returns { url } or { error }.
 export function parseFencerLink(text) {
