@@ -1,4 +1,5 @@
 import { setSwitchButtons } from './pill.js';
+import { pingToday } from './today-ping.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import { FEELINGS, PROMPTS, SORT_OPTIONS, appendPrompt, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import { parseIso, shiftAnchor, toIso } from './schedule.js';
@@ -430,4 +431,5 @@ $('#journalNext').addEventListener('click', () => {
 $('#journalToday').addEventListener('click', () => {
   anchorIso = toIso(new Date());
   renderJournal();
+  pingToday('#journalPage');
 });

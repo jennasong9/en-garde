@@ -80,13 +80,31 @@ function toggleDay(day, column, toggle) {
   else collapsedDays.delete(day);
   saveJson('mealDaysCollapsed', [...collapsedDays]);
   setFolded(column, toggle, folding);
+  updateExpandAll();
 }
+
+// One button for the whole plan: "Collapse all" while every day and History is open, otherwise
+// "Expand all". It presses whichever panels are not already in the wanted state, so they slide.
+const mealToggles = () => [...document.querySelectorAll('#mealGrid .meal-day-toggle')];
+
+function updateExpandAll() {
+  const allOpen = mealToggles().every((toggle) => toggle.getAttribute('aria-expanded') === 'true');
+  $('#expandAllBtn').textContent = allOpen ? 'Collapse all' : 'Expand all';
+}
+
+$('#expandAllBtn').addEventListener('click', () => {
+  const open = $('#expandAllBtn').textContent === 'Expand all';
+  for (const toggle of mealToggles()) {
+    if ((toggle.getAttribute('aria-expanded') === 'true') !== open) toggle.click();
+  }
+});
 
 export function renderNutrition() {
   renderNextMeals();
   renderMacroTargets();
   const today = new Date().getDay();
   $('#mealGrid').replaceChildren(...WEEK_ORDER.map((day) => dayColumn(DAY_NAMES[day], day, day === today)), historyPanel());
+  updateExpandAll();
 }
 
 function dayColumn(name, day, isToday) {
@@ -365,6 +383,7 @@ function historyPanel() {
       saveJson('mealHistoryHidden', historyHidden);
       summaryLine.textContent = historySummary();
       setFolded(panel, toggle, historyHidden);
+      updateExpandAll();
     },
   }, el('h3', { text: 'History' }), el('span', { class: 'chevron', 'aria-hidden': 'true' }));
   const historySummary = () => {

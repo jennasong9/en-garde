@@ -15,8 +15,68 @@ function pillFor(container) {
     const resizes = new ResizeObserver(() => place(container, false));
     resizes.observe(container);
     state.set(container, { pill, activeSelector: '', resizes, placed: '' });
+    enableDragSwitch(container);
   }
   return state.get(container);
+}
+
+const DRAG_START_PIXELS = 4;
+
+// With a mouse, pressing on a toggle and dragging along it chooses whichever button the pointer is
+// over, as if each were clicked. A phone or tablet finger does not do this (it would fight with
+// scrolling), and a plain click works as always.
+function enableDragSwitch(container) {
+  const { pill } = state.get(container);
+  container.classList.add('drag-switch');
+  container.addEventListener('dragstart', (event) => event.preventDefault());
+
+  const buttonNearest = (x) => {
+    let nearest = null;
+    let nearestDistance = Infinity;
+    for (const child of container.children) {
+      if (child === pill) continue;
+      const box = child.getBoundingClientRect();
+      const distance = x < box.left ? box.left - x : Math.max(0, x - box.right);
+      if (distance < nearestDistance) {
+        nearest = child;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  };
+
+  container.addEventListener('pointerdown', (event) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    if (!event.target.closest('.view-btn, .page-link')) return;
+    const startX = event.clientX;
+    let dragging = false;
+    let lastIndex = -1;
+
+    const onMove = (move) => {
+      if (!dragging && Math.abs(move.clientX - startX) < DRAG_START_PIXELS) return;
+      dragging = true;
+      const button = buttonNearest(move.clientX);
+      if (!button) return;
+      const index = [...container.children].indexOf(button);
+      if (index === lastIndex) return;
+      lastIndex = index;
+      const active = container.querySelector(state.get(container).activeSelector);
+      if (button !== active) button.click();
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      if (!dragging) return;
+      // The release after a drag is not a click on any one button.
+      const stopClick = (click) => click.stopPropagation();
+      window.addEventListener('click', stopClick, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', stopClick, { capture: true }), 0);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  });
 }
 
 function watchButtons(container) {

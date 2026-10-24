@@ -1,6 +1,8 @@
 import { burstConfetti } from './confetti.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import { setSwitchButtons, updateSwitch } from './pill.js';
+import { enableSwitchDrag } from './switch-drag.js';
+import { pingToday } from './today-ping.js';
 import { currentFencerLink, disconnectFencerLink, initFencerLinks, saveFencerLink } from './fencer-links.js';
 import { renderGoals } from './goals-page.js';
 import { renderHydration } from './hydration.js';
@@ -1082,6 +1084,7 @@ $('#nextBtn').addEventListener('click', () => {
 $('#todayBtn').addEventListener('click', () => {
   anchorIso = toIso(new Date());
   renderCalendar();
+  pingToday('#schedulePage');
 });
 
 phoneScreen.addEventListener('change', renderCalendar);
@@ -1092,6 +1095,7 @@ renderAll();
 initFencerLinks();
 initTheme();
 initFont();
+enableSwitchDrag();
 
 // ---------- pages ----------
 const PAGES = ['schedule', 'routines', 'nutrition', 'journal', 'goals'];

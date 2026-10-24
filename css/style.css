@@ -276,7 +276,8 @@ textarea { min-height: 76px; resize: vertical; }
 .link-btn:hover { color: var(--accent-hover); }
 
 /* ===== Calendar ===== */
-.calendar-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; }
+/* As tall as the arrow buttons, so a heading shown without them (Journal > List) keeps the same height. */
+.calendar-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; min-height: 44px; }
 .calendar-head h2 { margin: 0; font-size: 22px; }
 .calendar-nav { display: flex; align-items: center; gap: 8px; }
 
@@ -302,6 +303,17 @@ textarea { min-height: 76px; resize: vertical; }
 .cal-cell:hover { background: var(--surface-2); }
 .cal-cell.outside { background: var(--bg); color: var(--text-faint); }
 .cal-date { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 13px; border-radius: 50%; }
+.cal-date, .tg-day-num { position: relative; }
+.today-ping { position: absolute; inset: -2px; border: 2px solid var(--sage-deep); border-radius: 50%; opacity: 0; pointer-events: none; z-index: 3; animation: today-ping 1.2s ease-out forwards; }
+.today-ping.second { animation-delay: .4s; }
+.today-pop { animation: today-pop .5s ease-out; }
+@keyframes today-ping { 0% { transform: scale(1); opacity: .95; } 100% { transform: scale(2); opacity: 0; } }
+@keyframes today-pop { 0%, 100% { transform: scale(1); } 35% { transform: scale(1.3); } }
+@media (prefers-reduced-motion: reduce) {
+  .today-pop { animation: none; }
+  .today-ping { animation-name: today-ping-still; }
+  @keyframes today-ping-still { 0%, 100% { opacity: 0; } 30%, 70% { opacity: .95; } }
+}
 .cal-cell.today .cal-date { background: var(--sage-deep); color: var(--on-accent); font-weight: 700; }
 
 .chip {
@@ -362,6 +374,8 @@ textarea { min-height: 76px; resize: vertical; }
 .view-btn[aria-pressed="true"] { background: var(--sage-deep); color: var(--on-accent); }
 /* Toggles with a sliding pill (see js/pill.js): the pill is the green, the buttons sit on top. */
 .has-pill { position: relative; }
+.drag-switch { user-select: none; -webkit-user-select: none; }
+.drag-switch > a, .drag-switch > button { -webkit-user-drag: none; }
 .has-pill > .view-btn, .has-pill > .page-link { position: relative; z-index: 1; transition: color .2s ease; }
 .has-pill > .view-btn[aria-pressed="true"], .has-pill > .page-link[aria-current="page"] { background: none; }
 .pill { position: absolute; top: 0; left: 0; border-radius: 999px; background: var(--sage-deep); pointer-events: none; z-index: 0; transition: transform .3s cubic-bezier(.4, 0, .2, 1), width .3s cubic-bezier(.4, 0, .2, 1), height .3s ease, opacity .15s ease; }
@@ -773,6 +787,8 @@ form h3 { font-size: 17px; }
   .nutrition-top { grid-template-columns: 1fr; }
   .macro-target { grid-template-columns: 110px 1fr; }
   .page { padding-top: 16px; }
+  /* On phones the month name often wraps to two lines beside the arrows; List keeps that height too. */
+  #journalPage .calendar-head { min-height: 64px; }
   .masthead h1 { font-size: 24px; }
   .overview { grid-template-columns: 1fr; }
   .card { padding: 14px; }
