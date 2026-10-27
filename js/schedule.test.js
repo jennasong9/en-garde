@@ -2,18 +2,20 @@ import { FONT_CHOICES, normalizeFont } from './fonts.js';
 import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import {
-  STARTER_ROUTINES,
-  finishedRoutine,
-  normalizeSteps,
-  reconcileDone,
-  routineProgress,
-  routineSummary,
-  shortStarterName,
-  stepFromText,
+  MAX_STEPS,
+  SECTION_TYPES,
+  cleanStepsByType,
+  finishedSession,
+  keepTicksFor,
+  removeStep,
+  saveStep,
+  sessionProgress,
+  startingSteps,
+  stepKey,
   stepsDone,
   toggleStep,
-  validateRoutine,
-} from './routines.js';
+  validateStep,
+} from './sessionsteps.js';
 import { archivedGoals, boardGoals, canArchive, dueStatus, isUrgent, matchesTag, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
 import { appendPrompt, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import {
@@ -324,13 +326,6 @@ test('glassesToday only counts glasses logged on the same date', () => {
   equal(glassesToday({ date: '2026-10-13', glasses: 5 }, '2026-10-13'), 5);
   equal(glassesToday({ date: '2026-10-12', glasses: 5 }, '2026-10-13'), 0);
   equal(glassesToday({ date: '', glasses: 0 }, '2026-10-13'), 0);
-});
-
-test('finishedRoutine is true only for the tick that completes every step', () => {
-  equal(finishedRoutine({ done: 2, total: 3 }, { done: 3, total: 3 }), true);
-  equal(finishedRoutine({ done: 1, total: 3 }, { done: 2, total: 3 }), false);
-  equal(finishedRoutine({ done: 3, total: 3 }, { done: 2, total: 3 }), false);
-  equal(finishedRoutine({ done: 0, total: 0 }, { done: 0, total: 0 }), false);
 });
 
 test('allPrepped is true only for a day that has meals and all are prepped', () => {
@@ -775,97 +770,86 @@ test('upcomingMeals puts a meal with no time at the end of its day, and handles 
   equal(upcomingMeals([], wednesdayAt(8)), []);
 });
 
-// ---------- routines ----------
+// ---------- session steps (the Routines screen) ----------
 const row = (name, desc = '') => ({ name, desc });
 const stepList = (...names) => names.map((name) => row(name));
 
-test('validateRoutine accepts a good routine, with or without minutes or descriptions', () => {
-  equal(validateRoutine({ name: ' Warm-up ', minsText: '15', steps: [row(' Pulse raise ', ' 3 min jogging '), row('Stretch')] }),
-    { value: { name: 'Warm-up', mins: 15, steps: [row('Pulse raise', '3 min jogging'), row('Stretch')] } });
-  equal(validateRoutine({ name: 'Drill', minsText: '', steps: [row('One')] }).value.mins, null);
+test('the Routines sections are the session types, in the order of the calendar filters', () => {
+  equal(SECTION_TYPES, ['footwork', 'blade', 'bout', 'strength', 'rest', 'tournament', 'other']);
 });
 
-test('validateRoutine ignores empty rows and keeps the order of the rest', () => {
-  const result = validateRoutine({ name: 'Drill', minsText: '', steps: [row(''), row('A'), row('', ''), row('B', 'second'), row('  ', '  ')] });
-  equal(result.value.steps, [row('A'), row('B', 'second')]);
+test('a new visitor starts with Footwork and Bladework steps and nothing in the other sections', () => {
+  const start = startingSteps([]);
+  equal(start.footwork.length, 4);
+  equal(start.blade.length, 4);
+  equal(start.footwork[0], row('Advance-retreat', '4 lengths, small controlled steps.'));
+  for (const type of ['bout', 'strength', 'rest', 'tournament', 'other']) equal(start[type], []);
 });
 
-test('validateRoutine rejects a missing name, bad minutes, and bad steps', () => {
-  const ok = { name: 'Drill', minsText: '10', steps: [row('One')] };
-  equal(validateRoutine({ ...ok, name: '  ' }).error !== undefined, true);
-  equal(validateRoutine({ ...ok, name: 'x'.repeat(61) }).error !== undefined, true);
-  equal(validateRoutine({ ...ok, minsText: '-5' }).error !== undefined, true);
-  equal(validateRoutine({ ...ok, minsText: '12.5' }).error !== undefined, true);
-  equal(validateRoutine({ ...ok, minsText: '601' }).error !== undefined, true);
-  equal(validateRoutine({ ...ok, steps: [row(''), row('  ')] }).error !== undefined, true);
-  equal(validateRoutine({ ...ok, steps: [row('x'.repeat(101))] }).error !== undefined, true);
-  equal(validateRoutine({ ...ok, steps: [row('Fine', 'x'.repeat(201))] }).error !== undefined, true);
-  equal(validateRoutine({ ...ok, steps: Array.from({ length: 31 }, (_, i) => row('Step ' + i)) }).error !== undefined, true);
+test('a routine saved earlier keeps its steps when its name is a session type', () => {
+  const start = startingSteps([
+    { name: 'bouting', steps: [row('Warm bouts', 'first to 5'), 'Pool bout — to 5'] },
+    { name: 'Warmup', steps: [row('Jog')] },
+    { name: 'Footwork', steps: [] },
+  ]);
+  equal(start.bout, [row('Warm bouts', 'first to 5'), row('Pool bout', 'to 5')]);
+  equal(start.footwork.length, 4);
+  equal(startingSteps('nonsense').blade.length, 4);
 });
 
-test('validateRoutine says which step has a description but no name', () => {
-  equal(validateRoutine({ name: 'Drill', minsText: '', steps: [row('One'), row('', 'oops')] }).error, 'Give step 2 a name.');
+test('cleanStepsByType gives every type a list and drops steps that cannot be used', () => {
+  const clean = cleanStepsByType({ bout: [row('Good'), row('   '), { name: 'x'.repeat(101) }, 'Text — step', null], strength: 'oops' });
+  equal(clean.bout, [row('Good'), row('Text', 'step')]);
+  equal(clean.strength, []);
+  equal(Object.keys(clean), SECTION_TYPES);
+  equal(cleanStepsByType(null).footwork, []);
+  equal(cleanStepsByType({ rest: Array.from({ length: 40 }, (_, i) => row('Step ' + i)) }).rest.length, MAX_STEPS);
 });
 
-test('stepFromText splits at the first dash with spaces, and leaves other text as a name', () => {
-  equal(stepFromText('Lunge chain - advance, advance, lunge - 6 reps'), row('Lunge chain', 'advance, advance, lunge - 6 reps'));
-  equal(stepFromText('Pulse raise — 3 min'), row('Pulse raise', '3 min'));
-  equal(stepFromText('Pulse raise – 3 min'), row('Pulse raise', '3 min'));
-  equal(stepFromText('Warm-up the legs'), row('Warm-up the legs'));
-  equal(stepFromText('Advance-retreat - 4 lengths'), row('Advance-retreat', '4 lengths'));
+test('validateStep trims, needs a name, and limits the lengths', () => {
+  equal(validateStep({ name: ' Lunge ', desc: ' 10 reps ' }), { value: row('Lunge', '10 reps') });
+  equal(validateStep({ name: '', desc: 'oops' }).error, 'Give the step a name.');
+  equal(validateStep({ name: 'x'.repeat(101), desc: '' }).error !== undefined, true);
+  equal(validateStep({ name: 'Fine', desc: 'x'.repeat(201) }).error !== undefined, true);
 });
 
-test('normalizeSteps turns older text steps into name and description and keeps new ones', () => {
-  equal(normalizeSteps(['A — b', 'C', row('D', 'e'), { name: 'F' }]), [row('A', 'b'), row('C'), row('D', 'e'), row('F')]);
+test('saveStep adds to the end, replaces one in place, and refuses a duplicate or too many', () => {
+  const steps = stepList('A', 'B');
+  equal(saveStep(steps, row(' C '), -1).steps, stepList('A', 'B', 'C'));
+  equal(saveStep(steps, row('Z', 'new'), 0).steps, [row('Z', 'new'), row('B')]);
+  equal(saveStep(steps, row('A'), 1).error, 'That step is already in the list.');
+  equal(saveStep(steps, row('B'), 1).steps, steps);
+  equal(saveStep(steps, row(''), -1).error, 'Give the step a name.');
+  equal(saveStep(Array.from({ length: MAX_STEPS }, (_, i) => row('S' + i)), row('One more'), -1).error !== undefined, true);
+  equal(steps, stepList('A', 'B'));
 });
 
-test('routineSummary gives time and step count, and the starter routines are valid', () => {
-  equal(routineSummary({ mins: 15, steps: stepList('a', 'b') }), '15 min · 2 steps');
-  equal(routineSummary({ mins: null, steps: stepList('a') }), '1 step');
-  for (const starter of STARTER_ROUTINES) {
-    equal(validateRoutine({ name: starter.name, minsText: String(starter.mins), steps: starter.steps }).error, undefined);
-  }
-  equal(STARTER_ROUTINES.length, 4);
-  equal(STARTER_ROUTINES[0].steps[0], row('Pulse raise', '3 min light jogging or jump rope.'));
+test('removeStep drops one step and keeps the order of the rest', () => {
+  equal(removeStep(stepList('A', 'B', 'C'), 1), stepList('A', 'C'));
 });
 
-test('starter routines are named Warmup, Footwork, Bladework and Cooldown, and old starter names are shortened', () => {
-  equal(STARTER_ROUTINES.map((starter) => starter.name), ['Warmup', 'Footwork', 'Bladework', 'Cooldown']);
-  equal(shortStarterName('Warm-up sequence'), 'Warmup');
-  equal(shortStarterName('Warm-up'), 'Warmup');
-  equal(shortStarterName('Cool-down'), 'Cooldown');
-  equal(shortStarterName('My own routine'), 'My own routine');
-  equal(shortStarterName('toString'), 'toString');
+test('ticks are kept for each session as step keys, so an edited step loses its tick', () => {
+  const steps = stepList('A', 'B', 'C');
+  equal(stepsDone(steps, []), [false, false, false]);
+  const ticked = toggleStep(toggleStep([], steps[1]), steps[2]);
+  equal(stepsDone(steps, ticked), [false, true, true]);
+  equal(sessionProgress(steps, ticked), { done: 2, total: 3, fraction: 2 / 3 });
+  equal(stepsDone(steps, toggleStep(ticked, steps[1])), [false, false, true]);
+  equal(stepsDone([row('A'), row('B changed'), row('C')], ticked), [false, false, true]);
+  equal(sessionProgress([], []), { done: 0, total: 0, fraction: 0 });
+  equal(stepKey(row('A', 'x')) === stepKey(row('A')), false);
 });
 
-const drill = (extra = {}) => ({ id: 'r', name: 'Warm-up', mins: 10, steps: stepList('A', 'B', 'C', 'D'), ...extra });
-
-test('a routine with no saved checks has every step undone', () => {
-  equal(stepsDone(drill(), '2026-10-20'), [false, false, false, false]);
-  equal(routineProgress(drill(), '2026-10-20'), { done: 0, total: 4, fraction: 0 });
+test('finishedSession is true only for the tick that completes every step', () => {
+  equal(finishedSession({ done: 2, total: 3 }, { done: 3, total: 3 }), true);
+  equal(finishedSession({ done: 1, total: 3 }, { done: 2, total: 3 }), false);
+  equal(finishedSession({ done: 3, total: 3 }, { done: 2, total: 3 }), false);
+  equal(finishedSession({ done: 0, total: 0 }, { done: 0, total: 0 }), false);
 });
 
-test('toggleStep ticks a step for today, and unticks it again', () => {
-  const ticked = drill(toggleStep(drill(), 1, '2026-10-20'));
-  equal(stepsDone(ticked, '2026-10-20'), [false, true, false, false]);
-  const more = drill(toggleStep(ticked, 3, '2026-10-20'));
-  equal(routineProgress(more, '2026-10-20'), { done: 2, total: 4, fraction: 0.5 });
-  const undone = drill(toggleStep(more, 1, '2026-10-20'));
-  equal(stepsDone(undone, '2026-10-20'), [false, false, false, true]);
-});
-
-test('checks from an earlier day do not count today', () => {
-  const yesterday = drill({ doneDate: '2026-10-19', done: [true, true, true, true] });
-  equal(routineProgress(yesterday, '2026-10-20').done, 0);
-  const today = drill(toggleStep(yesterday, 0, '2026-10-20'));
-  equal(stepsDone(today, '2026-10-20'), [true, false, false, false]);
-});
-
-test('editing keeps the check on steps that did not change (name and description), and drops the rest', () => {
-  const r = drill({ doneDate: '2026-10-20', done: [true, true, false, true], steps: [row('A', 'x'), row('B'), row('C'), row('D')] });
-  equal(reconcileDone(r, [row('A', 'x'), row('B changed'), row('C'), row('D')], '2026-10-20').done, [true, false, false, true]);
-  equal(reconcileDone(r, [row('A', 'new description'), row('B')], '2026-10-20').done, [false, true]);
-  equal(reconcileDone(r, [row('A', 'x'), row('B'), row('C'), row('D'), row('E')], '2026-10-20').done, [true, true, false, true, false]);
+test('keepTicksFor forgets the ticks of sessions that were deleted from the Schedule', () => {
+  equal(keepTicksFor({ a: ['x'], b: ['y'] }, [{ id: 'b' }, { id: 'c' }]), { b: ['y'] });
+  equal(keepTicksFor({}, []), {});
 });
 
 test('the meal kinds are Breakfast, Lunch, Pre-training, Dinner and Snack', () => {

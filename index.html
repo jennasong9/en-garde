@@ -189,19 +189,18 @@
           <h2>Routines</h2>
           <p class="goal-summary" id="routineSummary"></p>
         </div>
-        <button class="btn" id="addRoutineBtn" type="button">+ New routine</button>
-      </div>
-      <p class="hint">Your reusable drills. Pick a routine to see its steps.</p>
-      <div class="routine-layout">
-        <div class="routine-side">
-          <div class="routine-list" id="routineList" role="group" aria-label="Routines"></div>
-          <label class="switch-row routine-option" for="strikeToggle" id="routineOption" hidden>
-            <span>Strikethrough completed steps</span>
-            <input type="checkbox" role="switch" id="strikeToggle" class="switch-toggle">
-          </label>
+        <div class="calendar-nav">
+          <button class="btn ghost" id="routineToday" type="button">Today</button>
+          <button class="icon-btn" id="routinePrev" type="button" aria-label="Previous day">&#8249;</button>
+          <button class="icon-btn" id="routineNext" type="button" aria-label="Next day">&#8250;</button>
         </div>
-        <div class="routine-detail" id="routineDetail" aria-live="polite"></div>
       </div>
+      <p class="hint">The sessions on your Schedule for the day, each with its steps. Tick steps off as you go. Steps are kept for each session type, so changing them changes every session of that type.</p>
+      <label class="switch-row routine-option" for="strikeToggle">
+        <span>Strikethrough completed steps</span>
+        <input type="checkbox" role="switch" id="strikeToggle" class="switch-toggle">
+      </label>
+      <div class="routine-sections" id="routineSections" aria-live="polite"></div>
     </section>
 
     <div id="nutritionPage" hidden>
@@ -334,36 +333,6 @@
         <span class="spacer"></span>
         <button class="btn ghost" id="trackerCancel" type="button">Cancel</button>
         <button class="btn" type="submit">Save link</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="routineDialog" aria-labelledby="routineDialogTitle">
-    <div class="dialog-head">
-      <h2 id="routineDialogTitle"></h2>
-      <button class="icon-btn" id="routineClose" type="button" aria-label="Close">&#10005;</button>
-    </div>
-    <form id="routineForm" novalidate>
-      <div class="field-row">
-        <label class="field field-wide">Name
-          <input type="text" id="rName" maxlength="60" placeholder="e.g. Warmup">
-        </label>
-        <label class="field">Minutes
-          <input type="number" id="rMins" min="0" max="600" inputmode="numeric" placeholder="15">
-        </label>
-      </div>
-      <fieldset class="field steps-fieldset">
-        <legend>Steps</legend>
-        <div class="step-rows-head" aria-hidden="true"><span></span><span></span><span>Step name</span><span>Description</span><span></span></div>
-        <div class="step-rows" id="routineStepRows"></div>
-        <button class="btn ghost small" id="addStepBtn" type="button">+ Add step</button>
-      </fieldset>
-      <p class="form-error" id="routineError" role="alert"></p>
-      <div class="form-actions">
-        <button class="btn danger" id="routineDelete" type="button" hidden>Delete</button>
-        <span class="spacer"></span>
-        <button class="btn ghost" id="routineCancel" type="button">Cancel</button>
-        <button class="btn" type="submit">Save routine</button>
       </div>
     </form>
   </dialog>
