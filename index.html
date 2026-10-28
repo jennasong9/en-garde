@@ -92,13 +92,14 @@
       <div class="calendar-head">
         <h2 id="calendarTitle" aria-live="polite"></h2>
         <div class="calendar-nav">
+          <button class="btn" id="addSessionTopBtn" type="button">+ Add session</button>
           <button class="btn ghost" id="todayBtn" type="button">Today</button>
           <button class="icon-btn" id="prevBtn" type="button">&#8249;</button>
           <button class="icon-btn" id="nextBtn" type="button">&#8250;</button>
         </div>
       </div>
       <div class="view-switch" id="viewSwitch" role="group" aria-label="Calendar view"></div>
-      <p class="hint">Click or tap a day to add or view sessions. Filter by type below.</p>
+      <p class="hint">Press "+ Add session" for today, or click or tap any day to add or view its sessions. Filter by type below.</p>
       <div id="monthView">
       <div class="weekdays" aria-hidden="true">
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
@@ -139,10 +140,13 @@
     <section id="journalPage" class="card" aria-label="Journal" hidden>
       <div class="calendar-head">
         <h2 id="journalTitle" aria-live="polite"></h2>
-        <div class="calendar-nav" id="journalNav">
-          <button class="btn ghost" id="journalToday" type="button">Today</button>
-          <button class="icon-btn" id="journalPrev" type="button" aria-label="Previous month">&#8249;</button>
-          <button class="icon-btn" id="journalNext" type="button" aria-label="Next month">&#8250;</button>
+        <div class="calendar-nav">
+          <button class="btn" id="journalAdd" type="button"></button>
+          <div class="calendar-nav" id="journalNav">
+            <button class="btn ghost" id="journalToday" type="button">Today</button>
+            <button class="icon-btn" id="journalPrev" type="button" aria-label="Previous month">&#8249;</button>
+            <button class="icon-btn" id="journalNext" type="button" aria-label="Next month">&#8250;</button>
+          </div>
         </div>
       </div>
       <div class="journal-toolbar">

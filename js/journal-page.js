@@ -53,13 +53,15 @@ export function renderJournal() {
   $('#sortOrderField').hidden = sort.by === 'custom';
   $('#sortHint').hidden = sort.by !== 'custom';
   $('#popupToggle').checked = popupMode;
+  // There is one entry per day, so the button says whether it starts today's entry or reopens it.
+  $('#journalAdd').textContent = entries[toIso(new Date())] ? "Edit today's entry" : "+ Write today's entry";
   if (view === 'calendar') {
     $('#journalTitle').textContent = parseIso(anchorIso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-    $('#journalHint').textContent = 'Tap a day to write about your session. Filter by feeling below.';
+    $('#journalHint').textContent = 'One entry per day: tap a day, or use the button above for today. Filter by feeling below.';
     renderCalendar();
   } else {
     $('#journalTitle').textContent = 'All entries';
-    $('#journalHint').textContent = 'Filter by feeling below.';
+    $('#journalHint').textContent = 'One entry per day. Filter by feeling below.';
     renderList();
   }
 }
@@ -428,6 +430,8 @@ $('#journalNext').addEventListener('click', () => {
   anchorIso = shiftAnchor('month', anchorIso, 1);
   renderJournal();
 });
+$('#journalAdd').addEventListener('click', () => openEntry(toIso(new Date())));
+
 $('#journalToday').addEventListener('click', () => {
   anchorIso = toIso(new Date());
   renderJournal();

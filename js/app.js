@@ -907,6 +907,12 @@ for (const field of [typeSelect, $('#fTime'), $('#fMins'), $('#fLocation'), $('#
   });
 }
 $('#addSessionBtn').addEventListener('click', () => openForm(null));
+
+// The button above the calendar: add a session for today, without having to find the day first.
+$('#addSessionTopBtn').addEventListener('click', () => {
+  openDay(toIso(new Date()));
+  openForm(null);
+});
 $('#cancelForm').addEventListener('click', closeForm);
 
 $('#sessionForm').addEventListener('submit', (event) => {

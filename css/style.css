@@ -757,8 +757,15 @@ form h3 { font-size: 17px; }
   .nutrition-top { grid-template-columns: 1fr; }
   .macro-target { grid-template-columns: 110px 1fr; }
   .page { padding-top: 16px; }
-  /* On phones the month name often wraps to two lines beside the arrows; List keeps that height too. */
-  #journalPage .calendar-head { min-height: 64px; }
+  /* On phones the heading gets its own row and the buttons (with the add button stretched) sit under it. */
+  .calendar-head { flex-wrap: wrap; }
+  .calendar-head > .calendar-nav { width: 100%; flex-wrap: wrap; }
+  /* The add button gets a row of its own, the date buttons the next. In Journal's List view (where
+     the date buttons are hidden) that row stays, empty, so the page does not move when switching views. */
+  #addSessionTopBtn, #journalAdd { flex: 1 0 100%; }
+  #journalNav { display: flex; flex: 1 0 100%; }
+  #journalNav .btn { flex: 1; }
+  #journalNav[hidden] { display: flex !important; visibility: hidden; }
   .masthead h1 { font-size: 24px; }
   .overview { grid-template-columns: 1fr; }
   .card { padding: 14px; }
