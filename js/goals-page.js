@@ -1,3 +1,4 @@
+import { burstConfetti } from './confetti.js';
 import { $, el, formState, protectUnsavedChanges } from './dom.js';
 import { setFolded } from './fold.js';
 import {
@@ -31,12 +32,6 @@ let confirmingDeleteInDialog = false;
 
 function persist() {
   saveJson('goals', goals);
-}
-
-// A steady tilt for each note, worked out from its id so it does not change between visits.
-function tiltFor(id) {
-  const total = [...id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return ((total % 5) - 2) * 0.7;
 }
 
 // The deadline line as a plain lead-in and a tail that turns red when the deadline is close.
@@ -116,17 +111,20 @@ function renderBoard() {
     }));
     return;
   }
-  for (const goal of shown) board.append(stickyNote(goal));
+  for (const goal of shown) board.append(goalCard(goal));
 }
 
-function stickyNote(goal) {
+const FENCER_SVG = '<svg viewBox="0 0 64 44" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<circle cx="16" cy="8" r="6" fill="currentColor" stroke="none"/>'
+  + '<path d="M16 15 L20 27 M20 27 L9 40 M20 27 L33 31 L35 41 M18 19 L8 14 M18 19 L36 21"/>'
+  + '<path d="M36 21 L62 15" stroke-width="1.6"/></svg>';
+
+function goalCard(goal) {
   const due = dueText(goal);
-  const note = el('article', { class: 'sticky goal-tag-' + goal.tag + (goal.progress >= 100 ? ' complete' : '') },
-    el('span', { class: 'sticky-tag', text: TAGS[goal.tag].label }),
-    el('h3', { class: 'sticky-name', text: goal.name }),
-    el('div', { class: 'sticky-due' }, due.lead, el('span', { class: due.urgent ? 'urgent' : '', text: due.tail })));
-  note.style.setProperty('--tilt', tiltFor(goal.id) + 'deg');
-  if (goal.progress >= 100) note.append(el('span', { class: 'sticky-stamp', text: 'DONE' }));
+  const card = el('article', { class: 'goal-card goal-tag-' + goal.tag + (goal.progress >= 100 ? ' complete' : ''), 'data-goal': goal.id },
+    el('span', { class: 'goal-card-tag', text: TAGS[goal.tag].label }),
+    el('h3', { class: 'goal-card-name', text: goal.name }),
+    el('div', { class: 'goal-card-due' }, due.lead, el('span', { class: due.urgent ? 'urgent' : '', text: due.tail })));
 
   const steps = el('div', { class: 'progress-steps', role: 'group', 'aria-label': 'Progress for ' + goal.name });
   const percentLabel = el('span', { class: 'progress-pct', text: goal.progress + '%' });
@@ -143,21 +141,33 @@ function stickyNote(goal) {
       },
     }, el('span')));
   }
-  wireProgressDrag(steps, percentLabel, goal);
-  note.append(el('div', { class: 'progress-row' }, steps, percentLabel));
-  note.append(noteActions(goal));
-  return note;
+  // A small fencer rides along the bars, at the front of the progress, closing in on the finish.
+  const fencer = el('span', { class: 'goal-fencer', 'aria-hidden': 'true' });
+  fencer.innerHTML = FENCER_SVG;
+  const track = el('div', { class: 'goal-track' }, steps, fencer);
+  track.style.setProperty('--pos', String(goal.progress / 100));
+  wireProgressDrag(steps, percentLabel, track, goal);
+  card.append(el('div', { class: 'progress-row' }, track, percentLabel));
+  card.append(cardActions(goal));
+  return card;
 }
 
 function setProgress(goal, percent) {
+  const wasFinished = goal.progress >= 100;
   goal.progress = percent;
   persist();
   renderGoals();
+  if (wasFinished || percent < 100) return;
+  // A finished goal is a touch: confetti from its percent.
+  const label = document.querySelector('[data-goal="' + goal.id + '"] .progress-pct');
+  if (!label) return;
+  const spot = label.getBoundingClientRect();
+  burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
 }
 
 // Click or tap a bar to set progress, or press and drag along the bars to slide it. While
 // dragging only the bars on screen change; the goal is saved when the pointer is released.
-function wireProgressDrag(steps, percentLabel, goal) {
+function wireProgressDrag(steps, percentLabel, track, goal) {
   let startIndex = null;
   let dragged = false;
   let previewPercent = goal.progress;
@@ -169,6 +179,7 @@ function wireProgressDrag(steps, percentLabel, goal) {
   const showPercent = (percent) => {
     previewPercent = percent;
     percentLabel.textContent = percent + '%';
+    track.style.setProperty('--pos', String(percent / 100));
     [...steps.children].forEach((button, index) => {
       button.setAttribute('aria-pressed', String(percent >= (index + 1) * (100 / PROGRESS_STEPS)));
     });
@@ -199,9 +210,9 @@ function wireProgressDrag(steps, percentLabel, goal) {
   });
 }
 
-function noteActions(goal) {
+function cardActions(goal) {
   if (confirmingDeleteId === goal.id) {
-    return el('div', { class: 'sticky-actions sticky-confirm' },
+    return el('div', { class: 'goal-card-actions goal-card-confirm' },
       el('span', { text: 'Delete this goal?' }),
       el('button', {
         class: 'btn danger small',
@@ -222,7 +233,7 @@ function noteActions(goal) {
   const archiveButtons = canArchive(goal)
     ? [el('button', { class: 'btn ghost small', type: 'button', text: 'Archive', 'aria-label': 'Archive ' + goal.name, onclick: () => archiveGoal(goal) })]
     : [];
-  return el('div', { class: 'sticky-actions' },
+  return el('div', { class: 'goal-card-actions' },
     ...archiveButtons,
     el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', 'aria-label': 'Edit ' + goal.name, onclick: () => openGoalForm(goal) }),
     el('button', {
@@ -257,7 +268,7 @@ function renderArchive() {
   $('#goalArchiveSummary').textContent = 'Archive (' + archived.length + ')';
   const list = $('#archiveList');
   if (archived.length === 0) {
-    list.replaceChildren(el('p', { class: 'empty', text: 'Nothing archived yet. Finish a goal, then tap "Archive" on its note.' }));
+    list.replaceChildren(el('p', { class: 'empty', text: 'Nothing archived yet. Finish a goal, then tap "Archive" on its card.' }));
     return;
   }
   list.replaceChildren(...archived.map(archivedItem));
@@ -349,6 +360,25 @@ $('#addGoalBtn').addEventListener('click', () => openGoalForm(null));
 $('#goalArchiveToggle').addEventListener('click', () => {
   const archive = $('#goalArchive');
   setFolded(archive, $('#goalArchiveToggle'), !archive.classList.contains('collapsed'));
+});
+
+// How big the goal cards are, which also sets how many fit on a row. Remembered on this device.
+const MIN_CARD_SIZE = 140;
+const MAX_CARD_SIZE = 420;
+const DEFAULT_CARD_SIZE = 250;
+const storedSize = loadJson('goalCardSize', DEFAULT_CARD_SIZE);
+let cardSize = Number.isFinite(storedSize) ? Math.max(MIN_CARD_SIZE, Math.min(MAX_CARD_SIZE, storedSize)) : DEFAULT_CARD_SIZE;
+
+function applyCardSize() {
+  $('#goalBoard').style.setProperty('--card-min', cardSize + 'px');
+  $('#goalCardSize').value = String(cardSize);
+}
+applyCardSize();
+
+$('#goalCardSize').addEventListener('input', (event) => {
+  cardSize = Number(event.target.value);
+  applyCardSize();
+  saveJson('goalCardSize', cardSize);
 });
 
 $('#hideCompleted').addEventListener('change', (event) => {
