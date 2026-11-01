@@ -1,5 +1,6 @@
 import { $, el, makeDraggable } from './dom.js';
 import { burstConfetti } from './confetti.js';
+import { setFoldSummary } from './foldable-cards.js';
 import { DEFAULT_GLASS_GOAL, MAX_GLASS_GOAL, glassesToday, reachedWaterGoal, tapGlass } from './meals.js';
 import { toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
@@ -39,6 +40,7 @@ function showGlasses(glasses) {
     drop.setAttribute('aria-pressed', String(index < glasses));
   });
   $('#hydrationText').textContent = glasses + ' of ' + hydration.goal + ' glasses';
+  setFoldSummary('hydration', glasses + ' of ' + hydration.goal + ' glasses today');
 }
 
 // Saves the count. Confetti pops from (x, y) when this release is the one that reaches the goal.

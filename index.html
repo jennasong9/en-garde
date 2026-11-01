@@ -26,11 +26,7 @@
 <body>
   <div class="page">
     <header class="masthead">
-      <div>
-        <h1 id="fencerName"></h1>
-        <p class="fencer-details" id="fencerDetails"></p>
-        <p class="fencer-links" id="fencerLinks"></p>
-      </div>
+      <h1 id="fencerName"></h1>
       <div class="masthead-side">
         <a class="mini-meals" id="miniMeals" href="#nutrition">
           <span class="mini-meals-title">Next meals</span>
@@ -65,12 +61,17 @@
 
     <div id="schedulePage">
     <section class="overview" aria-label="Overview">
-      <div class="card next-up">
-        <h2>Next on the strip</h2>
+      <div class="card next-up foldable" data-fold="nextUp">
+        <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h2>Next on the strip</h2><span class="chevron" aria-hidden="true"></span></button>
+        <span class="fold-summary"></span>
+        <div class="fold"><div class="fold-inner">
         <ol class="next-list" id="nextList"></ol>
+        </div></div>
       </div>
-      <div class="card stats">
-        <h2>This week</h2>
+      <div class="card stats foldable" data-fold="thisWeek">
+        <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h2>This week</h2><span class="chevron" aria-hidden="true"></span></button>
+        <span class="fold-summary"></span>
+        <div class="fold"><div class="fold-inner">
         <div class="ring-wrap">
           <div class="ring" role="img" id="weekRing">
             <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -85,12 +86,13 @@
           <p class="ring-hours"><b id="statHours">0</b> hours trained</p>
           <button class="link-btn" id="viewCompletedBtn" type="button">View completed sessions</button>
         </div>
+        </div></div>
       </div>
     </section>
 
     <section class="card calendar-card" aria-label="Practice calendar">
       <div class="calendar-head">
-        <h2 id="calendarTitle" aria-live="polite"></h2>
+        <div class="head-title"><h2 id="calendarTitle" aria-live="polite"></h2><button class="help-btn" type="button" data-help="scheduleHelp" aria-expanded="false" aria-label="Tips for the calendar">?</button></div>
         <div class="calendar-nav">
           <button class="btn" id="addSessionTopBtn" type="button">+ Add session</button>
           <button class="btn ghost" id="todayBtn" type="button">Today</button>
@@ -99,7 +101,7 @@
         </div>
       </div>
       <div class="view-switch" id="viewSwitch" role="group" aria-label="Calendar view"></div>
-      <p class="hint">Press "+ Add session" for today, or click or tap any day to add or view its sessions. Filter by type below.</p>
+<div class="help-panel collapsed" id="scheduleHelp"><div class="fold"><div class="fold-inner"><p class="hint">Press "+ Add session" for today, or click or tap any day to add or view its sessions. Filter by type with the colored buttons below the calendar.</p></div></div></div>
       <div id="monthView">
       <div class="weekdays" aria-hidden="true">
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
@@ -114,12 +116,12 @@
     <section id="goalsPage" class="card" aria-label="Goals" hidden>
       <div class="calendar-head">
         <div>
-          <h2>Goals</h2>
+          <div class="head-title"><h2>Goals</h2><button class="help-btn" type="button" data-help="goalsHelp" aria-expanded="false" aria-label="Tips for Goals">?</button></div>
           <p class="goal-summary" id="goalSummary"></p>
         </div>
         <button class="btn" id="addGoalBtn" type="button">+ Pin a new goal</button>
       </div>
-      <p class="hint">Add a new goal or tap the bars to track your progress.</p>
+<div class="help-panel collapsed" id="goalsHelp"><div class="fold"><div class="fold-inner"><p class="hint">Add a new goal with the button above. Tap or drag along a goal's bars to track your progress, and use Card size to change how big the cards are.</p></div></div></div>
       <div class="filters goal-filters" id="goalFilters" role="group" aria-label="Filter goals by tag"></div>
       <div class="goal-options">
         <label class="switch-row goal-option" for="hideCompleted">
@@ -193,7 +195,7 @@
     <section id="routinesPage" class="card" aria-label="Routines" hidden>
       <div class="calendar-head">
         <div>
-          <h2>Routines</h2>
+          <div class="head-title"><h2>Routines</h2><button class="help-btn" type="button" data-help="routinesHelp" aria-expanded="false" aria-label="Tips for Routines">?</button></div>
           <p class="goal-summary" id="routineSummary"></p>
         </div>
         <div class="calendar-nav">
@@ -202,7 +204,7 @@
           <button class="icon-btn" id="routineNext" type="button" aria-label="Next day">&#8250;</button>
         </div>
       </div>
-      <p class="hint">The sessions on your Schedule for the day, each with its steps. Tick steps off as you go. Steps are kept for each session type, so changing them changes every session of that type.</p>
+<div class="help-panel collapsed" id="routinesHelp"><div class="fold"><div class="fold-inner"><p class="hint">The sessions on your Schedule for the day, each with its steps. Tick steps off as you go. Steps are kept for each session type, so changing them changes every session of that type.</p></div></div></div>
       <label class="switch-row routine-option" for="strikeToggle">
         <span>Strikethrough completed steps</span>
         <input type="checkbox" role="switch" id="strikeToggle" class="switch-toggle">
@@ -212,34 +214,38 @@
 
     <div id="nutritionPage" hidden>
       <div class="nutrition-top">
-        <section class="card" aria-label="Macro targets">
-          <h2>Daily macro targets</h2>
-          <p class="hint">Set your daily goals in grams. Each day in the plan below shows how its meals compare.</p>
+        <section class="card foldable" data-fold="macros" aria-label="Macro targets">
+          <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h2>Daily macro targets</h2><span class="chevron" aria-hidden="true"></span></button>
+          <span class="fold-summary"></span>
+          <div class="fold"><div class="fold-inner">
           <div class="macro-targets" id="macroTargets"></div>
           <p class="macro-total" id="macroTotal"></p>
           <p class="form-error" id="targetError" role="alert"></p>
+          </div></div>
         </section>
-        <section class="card" aria-label="Hydration">
-          <h2>Hydration</h2>
-          <p class="hint">Tap a drop for each glass of water you drink. Resets every day.</p>
+        <section class="card foldable" data-fold="hydration" aria-label="Hydration">
+          <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h2>Hydration</h2><span class="chevron" aria-hidden="true"></span></button>
+          <span class="fold-summary"></span>
+          <div class="fold"><div class="fold-inner">
           <div class="drops" id="drops"></div>
           <p class="hydration-text" id="hydrationText"></p>
           <label class="field goal-field">Daily goal (glasses)
             <input type="number" id="glassGoal" min="1" max="20" inputmode="numeric">
           </label>
           <p class="form-error" id="goalError" role="alert"></p>
+          </div></div>
         </section>
       </div>
       <section class="card" aria-label="Weekly meal plan">
         <div class="calendar-head plan-head">
-          <h2>Weekly meal plan</h2>
+          <div class="head-title"><h2>Weekly meal plan</h2><button class="help-btn" type="button" data-help="mealsHelp" aria-expanded="false" aria-label="Tips for the meal plan">?</button></div>
           <div class="plan-actions">
             <button class="btn ghost" id="expandAllBtn" type="button">Collapse all</button>
             <button class="btn ghost" id="loadPlanBtn" type="button">Load saved meal plan</button>
             <button class="btn" id="savePlanBtn" type="button">Save weekly meal plan</button>
           </div>
         </div>
-        <p class="hint">Plan the meals for each day. The plan repeats every week. Tap a meal to edit or copy it, or tick it once it's prepped.</p>
+        <div class="help-panel collapsed" id="mealsHelp"><div class="fold"><div class="fold-inner"><p class="hint">Plan the meals for each day. The plan repeats every week. Tap a meal to edit or copy it, or tick it once it's prepped. Each day's heading folds that day away.</p></div></div></div>
         <p class="status" id="mealStatus" role="status"></p>
         <div class="meal-scroll"><div class="meal-grid" id="mealGrid"></div></div>
       </section>
@@ -557,6 +563,11 @@
           <button type="button" role="radio" class="font-option" data-font="mono">Mono</button>
         </div>
       </div>
+    </section>
+
+    <section class="settings-section" aria-labelledby="linksTitle">
+      <h3 id="linksTitle">Links</h3>
+      <p class="fencer-links" id="fencerLinks"></p>
     </section>
 
     <section class="settings-section" aria-labelledby="profileTitle">

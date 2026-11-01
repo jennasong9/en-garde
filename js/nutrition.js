@@ -1,4 +1,5 @@
 import { burstConfetti } from './confetti.js';
+import { setFoldSummary } from './foldable-cards.js';
 import { foldBody, setFolded } from './fold.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import {
@@ -214,6 +215,9 @@ function renderMacroTargets() {
     $('#sharetext-' + macro).textContent = macroTargets[macro] ? shares[macro] + '% of calories' : '';
   }
   const kcal = macroKcal(macroTargets);
+  setFoldSummary('macros', kcal === 0
+    ? 'No targets set yet'
+    : MACROS.map((macro) => MACRO_LABELS[macro][0] + ' ' + (macroTargets[macro] || 0)).join(' · ') + ' g · about ' + kcal.toLocaleString() + ' kcal');
   $('#macroTotal').textContent = kcal === 0
     ? 'No targets set yet. Enter your daily grams above.'
     : 'These targets add up to about ' + kcal.toLocaleString() + ' kcal a day.';

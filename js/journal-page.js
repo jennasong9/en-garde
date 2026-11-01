@@ -57,11 +57,11 @@ export function renderJournal() {
   $('#journalAdd').textContent = entries[toIso(new Date())] ? "Edit today's entry" : "+ Write today's entry";
   if (view === 'calendar') {
     $('#journalTitle').textContent = parseIso(anchorIso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-    $('#journalHint').textContent = 'One entry per day: tap a day, or use the button above for today. Filter by feeling below.';
+    $('#journalHint').textContent = 'One entry per day.';
     renderCalendar();
   } else {
     $('#journalTitle').textContent = 'All entries';
-    $('#journalHint').textContent = 'One entry per day. Filter by feeling below.';
+    $('#journalHint').textContent = 'One entry per day.';
     renderList();
   }
 }

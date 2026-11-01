@@ -124,10 +124,24 @@ h1, h2, h3 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px 20px;
+  padding: 24px 28px;
 }
 
 .card h2 { font-size: 18px; margin-bottom: 12px; }
+/* Cards that fold: the title is the button, with a one-line summary under it. */
+.fold-init > .fold, .fold-init .chevron { transition: none !important; }
+.foldable .fold-title { align-self: stretch; justify-content: flex-start; width: 100%; min-height: 36px; }
+.foldable .fold-title h2 { margin: 0; }
+.fold-summary { display: block; margin: 0 0 2px; font-size: 13px; color: var(--text-dim); }
+.foldable:not(.collapsed) .fold-summary { display: none; }
+.foldable .fold-inner { padding-top: 12px; }
+/* The "?" beside a page title, and the tip it opens. */
+.head-title { display: flex; align-items: center; gap: 10px; }
+.head-title h2 { margin: 0; }
+.help-btn { width: 26px; height: 26px; flex: 0 0 auto; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: none; color: var(--text-dim); font: inherit; font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer; }
+.help-btn:hover, .help-btn[aria-expanded="true"] { background: var(--sage-soft); border-color: var(--sage); color: var(--sage-deep); }
+.help-panel .fold-inner { padding: 4px 3px 0; }
+.help-panel .hint { margin: 0 0 8px; }
 
 /* ===== Buttons and fields ===== */
 .btn {
@@ -191,7 +205,7 @@ textarea { min-height: 76px; resize: vertical; }
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .masthead h1 { font-size: 30px; }
 .fencer-links { margin: 6px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 14px; }
@@ -237,10 +251,9 @@ textarea { min-height: 76px; resize: vertical; }
 .mini-fill { stroke: var(--sage-deep); stroke-linecap: round; stroke-dasharray: 113.1; stroke-dashoffset: 113.1; transition: stroke-dashoffset .4s ease; }
 .mini-count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--sage-deep); }
 .mini-label { font-size: 13px; font-weight: 500; max-width: 74px; line-height: 1.25; }
-.fencer-details { margin: 4px 0 0; color: var(--text-dim); }
 
 /* ===== Overview ===== */
-.overview { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 16px; }
+.overview { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; margin-bottom: 24px; align-items: start; }
 
 .next-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .next-item {
@@ -440,7 +453,7 @@ textarea { min-height: 76px; resize: vertical; }
 .now-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--clay); pointer-events: none; z-index: 2; }
 .now-line::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--clay); }
 
-.page-nav { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 16px; border-radius: 999px; background: var(--surface-2); }
+.page-nav { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 24px; border-radius: 999px; background: var(--surface-2); }
 .page-link { min-height: 40px; padding: 0 20px; display: inline-flex; align-items: center; border-radius: 999px; color: var(--text-dim); font-weight: 500; text-decoration: none; }
 .page-link:hover { color: var(--sage-deep); }
 .page-link[aria-current="page"] { background: var(--sage-deep); color: var(--on-accent); }
@@ -525,10 +538,10 @@ textarea { min-height: 76px; resize: vertical; }
 .goal-card-confirm { font-size: 13px; }
 
 .fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .28s ease; }
-.fold-inner { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; padding: 8px 3px 3px; margin: 0 -3px -3px; transition: visibility 0s; }
+.fold-inner { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; padding: 8px 3px 3px; margin: 0 -3px -3px; transition: visibility 0s, padding .28s ease, margin .28s ease; }
 .collapsed > .fold { grid-template-rows: 0fr; }
 /* A closed body is also hidden from the keyboard and screen readers, once it has finished sliding shut. */
-.collapsed > .fold > .fold-inner { visibility: hidden; transition: visibility 0s .28s; }
+.collapsed > .fold > .fold-inner { visibility: hidden; padding-top: 0; padding-bottom: 0; margin-bottom: 0; transition: visibility 0s .28s, padding .28s ease, margin .28s ease; }
 .goal-archive { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 14px; }
 .archive-toggle { min-height: 36px; font-weight: 600; }
 .archive-list { display: flex; flex-direction: column; gap: 8px; }
@@ -591,7 +604,7 @@ textarea { min-height: 76px; resize: vertical; }
 .plan-confirm span { font-size: 14px; font-weight: 600; }
 
 /* ===== Nutrition ===== */
-.nutrition-top { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }
+.nutrition-top { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; margin-bottom: 24px; align-items: start; }
 .macro-targets { display: flex; flex-direction: column; gap: 14px; }
 .macro-target { display: grid; grid-template-columns: 140px 1fr; grid-template-areas: "input bar" "input share"; column-gap: 14px; row-gap: 2px; align-items: center; }
 .macro-target .field { grid-area: input; }

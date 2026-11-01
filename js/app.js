@@ -1,5 +1,7 @@
 import { burstConfetti } from './confetti.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
+import { initFoldableCards, setFoldSummary } from './foldable-cards.js';
+import { initHelp } from './help.js';
 import { setSwitchButtons, updateSwitch } from './pill.js';
 import { enableSwitchDrag } from './switch-drag.js';
 import { pingToday } from './today-ping.js';
@@ -97,8 +99,6 @@ function describeDay(iso) {
 // ---------- header ----------
 function renderProfile() {
   $('#fencerName').textContent = profile.name;
-  const parts = [profile.weapon, profile.club || 'No club attached', profile.rating ? 'Rating ' + profile.rating : 'Unrated'];
-  $('#fencerDetails').textContent = parts.join(' · ');
 }
 
 function renderNextUp() {
@@ -107,8 +107,11 @@ function renderNextUp() {
   const upcoming = nextSessions(sessions, new Date(), 3);
   if (upcoming.length === 0) {
     list.append(el('li', { class: 'empty', text: 'Nothing scheduled yet. Tap a day on the calendar to add a session.' }));
+    setFoldSummary('nextUp', 'Nothing scheduled yet');
     return;
   }
+  const first = upcoming[0];
+  setFoldSummary('nextUp', describeDay(first.date) + ' · ' + SESSION_TYPES[first.type].short + (first.time ? ' ' + formatTime(first.time) : ''));
   for (const session of upcoming) {
     const detail = [formatTime(session.time), session.mins ? session.mins + ' min' : ''].filter(Boolean).join(' · ');
     const what = el('div', { class: 'next-what' }, el('b', { text: SESSION_TYPES[session.type].label }));
@@ -135,6 +138,7 @@ function renderStats() {
   setRing($('#ringFill'), 52, fraction);
   $('#weekRing').setAttribute('aria-label', summary);
   $('#statHours').textContent = String(Math.round(stats.hours * 10) / 10);
+  setFoldSummary('thisWeek', summary.replace(' this week', '') + ' · ' + String(Math.round(stats.hours * 10) / 10) + ' h');
 
   // The small ring in the header keeps the week's progress in view on the other tabs.
   $('#miniRingCount').textContent = stats.done + '/' + stats.planned;
@@ -1101,6 +1105,8 @@ renderAll();
 initFencerLinks();
 initTheme();
 initFont();
+initFoldableCards();
+initHelp();
 enableSwitchDrag();
 
 // ---------- pages ----------
@@ -1115,6 +1121,8 @@ function showPage() {
     $('#nav' + capitalized).setAttribute('aria-current', name === page ? 'page' : 'false');
   }
   updateSwitch($('.page-nav'), '[aria-current="page"]');
+  // "Next meals" only shows where it is useful: on the Nutrition page.
+  $('#miniMeals').hidden = page !== 'nutrition';
   renderNextMeals();
   if (page === 'nutrition') {
     renderNutrition();
