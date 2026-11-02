@@ -17,6 +17,7 @@ import {
   validateStep,
 } from './sessionsteps.js';
 import { archivedGoals, boardGoals, canArchive, dueStatus, isUrgent, matchesTag, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
+import { renderFocusStrip } from './focus-strip.js';
 import { entryParts, latestFocus, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import {
   addTemplateToDays,
@@ -432,6 +433,26 @@ test('latestFocus is the next-session focus of the most recent entry that has on
     '2026-10-05': { feeling: 'tired', focus: '  Relax my arm ' },
     '2026-10-09': { feeling: 'steady', text: 'No focus written' },
   }), { date: '2026-10-05', focus: 'Relax my arm' });
+});
+
+test('the focus strip shows the latest focus, hides when there is none, and has an Open Journal button only when asked', () => {
+  const strip = document.createElement('div');
+  renderFocusStrip(strip, {});
+  equal(strip.hidden, true);
+
+  const entries = { '2026-10-05': { feeling: 'tired', focus: 'Relax my arm' }, '2026-10-01': { feeling: 'sharp', focus: 'Old focus' } };
+  renderFocusStrip(strip, entries);
+  equal(strip.hidden, false);
+  equal(strip.textContent.includes('Relax my arm'), true);
+  equal(strip.textContent.includes('Old focus'), false);
+  equal(strip.querySelector('button'), null);
+
+  let opened = 0;
+  renderFocusStrip(strip, entries, { openJournal: () => { opened += 1; } });
+  const button = strip.querySelector('button');
+  equal(button.textContent, 'Open Journal');
+  button.click();
+  equal(opened, 1);
 });
 
 // ---------- goals ----------

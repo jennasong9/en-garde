@@ -1,8 +1,9 @@
 import { setSwitchButtons } from './pill.js';
 import { showDialog } from './dialog-motion.js';
+import { renderFocusStrip } from './focus-strip.js';
 import { pingToday } from './today-ping.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
-import { FEELINGS, SHORT_FIELDS, SORT_OPTIONS, entryParts, latestFocus, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
+import { FEELINGS, SHORT_FIELDS, SORT_OPTIONS, entryParts, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import { SESSION_TYPES, formatTime, parseIso, sessionsOn, shiftAnchor, toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
 
@@ -66,7 +67,7 @@ export function renderJournal() {
   $('#popupToggle').checked = popupMode;
   // There is one entry per day, so the button says whether it starts today's entry or reopens it.
   $('#journalAdd').textContent = entries[toIso(new Date())] ? "Edit today's entry" : "+ Write today's entry";
-  renderFocus();
+  renderFocusStrip($('#journalFocus'), entries);
   if (view === 'calendar') {
     $('#journalTitle').textContent = parseIso(anchorIso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     $('#journalHint').textContent = 'One entry per day.';
@@ -76,15 +77,6 @@ export function renderJournal() {
     $('#journalHint').textContent = 'One entry per day.';
     renderList();
   }
-}
-
-// The strip at the top reminds the fencer what they decided to focus on in their last entry.
-function renderFocus() {
-  const latest = latestFocus(entries);
-  $('#journalFocus').hidden = latest === null;
-  if (!latest) return;
-  $('#journalFocusText').textContent = latest.focus;
-  $('#journalFocusFrom').textContent = 'from ' + longDate(latest.date);
 }
 
 // Writes an entry's filled-in boxes into `box`, each under its bold label, one per line.
