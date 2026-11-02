@@ -101,7 +101,7 @@
         </div>
       </div>
       <div class="view-switch" id="viewSwitch" role="group" aria-label="Calendar view"></div>
-<div class="help-panel collapsed" id="scheduleHelp"><div class="fold"><div class="fold-inner"><p class="hint">Press "+ Add session" for today, or click or tap any day to add or view its sessions. Filter by type with the colored buttons below the calendar.</p></div></div></div>
+<div class="help-panel" id="scheduleHelp"><ul><li>Press "+ Add session" to add one for today</li><li>Click or tap any day to see or add its sessions</li><li>Use the colored buttons below the calendar to filter by type</li></ul></div>
       <div id="monthView">
       <div class="weekdays" aria-hidden="true">
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
@@ -116,12 +116,12 @@
     <section id="goalsPage" class="card" aria-label="Goals" hidden>
       <div class="calendar-head">
         <div>
-          <div class="head-title"><h2>Goals</h2><button class="help-btn" type="button" data-help="goalsHelp" aria-expanded="false" aria-label="Tips for Goals">?</button></div>
+          <div class="head-title"><h2>Goals</h2><button class="rating-badge" id="goalRating" type="button" title="Change your rating in Settings"></button><button class="help-btn" type="button" data-help="goalsHelp" aria-expanded="false" aria-label="Tips for Goals">?</button></div>
           <p class="goal-summary" id="goalSummary"></p>
         </div>
         <button class="btn" id="addGoalBtn" type="button">+ Pin a new goal</button>
       </div>
-<div class="help-panel collapsed" id="goalsHelp"><div class="fold"><div class="fold-inner"><p class="hint">Add a new goal with the button above. Tap or drag along a goal's bars to track your progress, and use Card size to change how big the cards are.</p></div></div></div>
+<div class="help-panel" id="goalsHelp"><ul><li>Add a goal with the button above</li><li>Tap or drag along a goal's bars to track progress</li><li>Card size changes how big the cards are</li></ul></div>
       <div class="filters goal-filters" id="goalFilters" role="group" aria-label="Filter goals by tag"></div>
       <div class="goal-options">
         <label class="switch-row goal-option" for="hideCompleted">
@@ -204,7 +204,7 @@
           <button class="icon-btn" id="routineNext" type="button" aria-label="Next day">&#8250;</button>
         </div>
       </div>
-<div class="help-panel collapsed" id="routinesHelp"><div class="fold"><div class="fold-inner"><p class="hint">The sessions on your Schedule for the day, each with its steps. Tick steps off as you go. Steps are kept for each session type, so changing them changes every session of that type.</p></div></div></div>
+<div class="help-panel" id="routinesHelp"><ul><li>Tick steps off as you go</li><li>Steps belong to a session type, so changing one changes every session of that type</li></ul></div>
       <label class="switch-row routine-option" for="strikeToggle">
         <span>Strikethrough completed steps</span>
         <input type="checkbox" role="switch" id="strikeToggle" class="switch-toggle">
@@ -245,7 +245,7 @@
             <button class="btn" id="savePlanBtn" type="button">Save weekly meal plan</button>
           </div>
         </div>
-        <div class="help-panel collapsed" id="mealsHelp"><div class="fold"><div class="fold-inner"><p class="hint">Plan the meals for each day. The plan repeats every week. Tap a meal to edit or copy it, or tick it once it's prepped. Each day's heading folds that day away.</p></div></div></div>
+        <div class="help-panel" id="mealsHelp"><ul><li>Tap a meal to edit or copy it</li><li>Tick a meal once it's prepped</li><li>Tap a day's heading to fold it away</li><li>The plan repeats every week</li></ul></div>
         <p class="status" id="mealStatus" role="status"></p>
         <div class="meal-scroll"><div class="meal-grid" id="mealGrid"></div></div>
       </section>
@@ -267,11 +267,15 @@
       <label class="field">Session type
         <select id="fType"></select>
       </label>
+      <label class="switch">
+        <input type="checkbox" id="fAllDay">
+        <span>All day</span>
+      </label>
       <div class="field-row">
-        <label class="field">Time
+        <label class="field" id="timeField">Time
           <input type="time" id="fTime">
         </label>
-        <label class="field">Duration (minutes)
+        <label class="field" id="durationField">Duration (minutes)
           <input type="number" id="fMins" min="0" max="600" step="5" inputmode="numeric">
         </label>
       </div>

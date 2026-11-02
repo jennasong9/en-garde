@@ -82,7 +82,7 @@ function sessionSection(session) {
   const progress = sessionProgress(steps, doneKeys);
   const info = SESSION_TYPES[session.type];
 
-  const meta = [session.time ? formatTime(session.time) : 'Any time', session.mins ? session.mins + ' min' : '', session.location]
+  const meta = [session.time ? formatTime(session.time) : 'All day', session.mins ? session.mins + ' min' : '', session.location]
     .filter(Boolean).join(' · ');
   const head = el('div', { class: 'routine-section-head' },
     el('h3', { text: info.label }),

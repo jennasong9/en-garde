@@ -140,8 +140,13 @@ h1, h2, h3 {
 .head-title h2 { margin: 0; }
 .help-btn { width: 26px; height: 26px; flex: 0 0 auto; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: none; color: var(--text-dim); font: inherit; font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer; }
 .help-btn:hover, .help-btn[aria-expanded="true"] { background: var(--sage-soft); border-color: var(--sage); color: var(--sage-deep); }
-.help-panel .fold-inner { padding: 4px 3px 0; }
-.help-panel .hint { margin: 0 0 8px; }
+.help-panel { display: none; }
+.tip-toast { position: fixed; left: 16px; bottom: 16px; z-index: 50; max-width: min(340px, calc(100vw - 32px)); padding: 12px 16px; border: 1px solid var(--sage); border-radius: 12px; background: var(--surface, #fff); color: var(--text); box-shadow: 0 6px 24px rgba(0, 0, 0, .18); font-size: 14px; line-height: 1.45; cursor: pointer; opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease; }
+.tip-toast ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.tip-toast li { position: relative; padding-left: 18px; }
+.tip-toast li::before { content: ''; position: absolute; left: 2px; top: .5em; width: 7px; height: 7px; border-radius: 50%; background: var(--sage); }
+.tip-toast.show { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .tip-toast { transition: opacity .4s ease; transform: none; } }
 
 /* ===== Buttons and fields ===== */
 .btn {
@@ -485,6 +490,8 @@ textarea { min-height: 76px; resize: vertical; }
 .routine-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 
 /* ===== Goals ===== */
+.rating-badge { flex: 0 0 auto; padding: 4px 12px; border: 1px solid var(--sage); border-radius: 999px; background: var(--sage-soft); color: var(--sage-deep); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rating-badge:hover { background: var(--surface-2); }
 .goal-summary { margin: 2px 0 0; color: var(--text-dim); font-size: 14px; }
 .goal-filters { margin: 0 0 8px; }
 .goal-filters .filter-chip { --c: var(--pin); background: var(--paper); border-color: color-mix(in srgb, var(--pin) 40%, var(--mix-base)); color: var(--note-text); }

@@ -99,6 +99,8 @@ function describeDay(iso) {
 // ---------- header ----------
 function renderProfile() {
   $('#fencerName').textContent = profile.name;
+  // The Goals page shows the rating, which is kept off the other pages to keep them calm.
+  $('#goalRating').textContent = profile.rating ? 'Rated ' + profile.rating : 'Add your rating';
 }
 
 function renderNextUp() {
@@ -119,7 +121,7 @@ function renderNextUp() {
     list.append(
       el('li', { class: 'next-item type-' + session.type },
         el('div', {}, el('div', { class: 'next-when', text: describeDay(session.date) }),
-          el('div', { class: 'next-time', text: detail || 'Any time' })),
+          el('div', { class: 'next-time', text: detail || 'All day' })),
         what),
     );
   }
@@ -306,7 +308,7 @@ function renderTimeGrid() {
   const atHour = (hoursFromTop) => 'calc(var(--hour-h) * ' + hoursFromTop + ')';
 
   const head = el('div', { class: 'tg-row tg-head' }, el('div'));
-  const anytime = el('div', { class: 'tg-row tg-anytime' }, el('div', { class: 'tg-anytime-label', text: 'Any time' }));
+  const anytime = el('div', { class: 'tg-row tg-anytime' }, el('div', { class: 'tg-anytime-label', text: 'All day' }));
   const body = el('div', { class: 'tg-row' });
   const gutter = el('div', { class: 'tg-gutter' });
   for (let hour = startHour; hour < endHour; hour++) {
@@ -347,7 +349,7 @@ function renderTimeGrid() {
     body.append(column);
   });
 
-  // The day names (and the "Any time" strip) stay at the top while the hours scroll under them.
+  // The day names (and the "All day" strip) stay at the top while the hours scroll under them.
   const top = el('div', { class: 'tg-top' }, head);
   const hasUntimed = days.some((iso) => (byDate.get(iso) || []).some((s) => !s.time));
   if (hasUntimed) top.append(anytime);
@@ -499,7 +501,7 @@ function moveSessionTo(session, startMinutes) {
   focusSession(session.id);
 }
 
-// Saves a session's new date (an "any time" session has no time to change) and redraws.
+// Saves a session's new date (an all-day session has no time to change) and redraws.
 function moveSessionToDay(session, iso) {
   session.date = iso;
   persist();
@@ -576,14 +578,14 @@ moveDuplicateDialog.addEventListener('close', () => {
 });
 closeOnBackdropClick(moveDuplicateDialog);
 
-// A session with no time, shown in the "Any time" strip. It can be dragged sideways onto another
+// A session with no time, shown in the "All day" strip. It can be dragged sideways onto another
 // day shown in the view (the left and right arrow keys move it too); tapping it opens its day.
 function anyTimeChip(session, days, dayIndex) {
   const chip = el('button', {
     class: 'chip type-' + session.type + (session.done ? ' done' : ''),
     type: 'button',
     'data-id': session.id,
-    'aria-label': SESSION_TYPES[session.type].label + ', any time, on ' + longDate(days[dayIndex])
+    'aria-label': SESSION_TYPES[session.type].label + ', all day, on ' + longDate(days[dayIndex])
       + '. Drag, or press the left and right arrow keys, to move it to another day.',
   }, el('span', { class: 'chip-text', text: SESSION_TYPES[session.type].short }));
 
@@ -821,12 +823,23 @@ function plural(count, word) {
   return count + ' ' + word + (count === 1 ? '' : 's');
 }
 
+// An all-day session has no start time or length to edit, and a tournament has no set length, so
+// the boxes that do not apply are hidden.
+function showTimeFields() {
+  const allDay = $('#fAllDay').checked;
+  $('#timeField').hidden = allDay;
+  $('#durationField').hidden = allDay || typeSelect.value === 'tournament';
+}
+
 // The values currently typed into the session form (length is not checked here).
 function readFields() {
-  const minsText = $('#fMins').value.trim();
+  const hasLength = $('#durationField').hidden === false;
+  const minsText = hasLength ? $('#fMins').value.trim() : '';
+  // A session with no start time is an all-day session.
+  const allDay = $('#fAllDay').checked;
   return {
     type: typeSelect.value,
-    time: $('#fTime').value,
+    time: allDay ? '' : $('#fTime').value,
     mins: minsText === '' ? 0 : Number(minsText),
     location: $('#fLocation').value.trim(),
     notes: $('#fNotes').value.trim(),
@@ -880,6 +893,8 @@ function openForm(session, presetTime = '') {
   $('#saveSession').textContent = session ? 'Save changes' : 'Save session';
   typeSelect.value = session ? session.type : 'footwork';
   $('#fTime').value = session ? session.time : presetTime;
+  $('#fAllDay').checked = session ? session.time === '' : false;
+  showTimeFields();
   $('#fMins').value = session ? session.mins : 60;
   $('#fLocation').value = session ? session.location : '';
   $('#fNotes').value = session ? session.notes : '';
@@ -905,11 +920,18 @@ $('#fRepeat').addEventListener('change', (event) => {
 });
 $('#fUntil').addEventListener('input', updateRepeatSummary);
 // The identical-session check depends on every detail, so re-check when any of them change.
-for (const field of [typeSelect, $('#fTime'), $('#fMins'), $('#fLocation'), $('#fNotes')]) {
+for (const field of [typeSelect, $('#fAllDay'), $('#fTime'), $('#fMins'), $('#fLocation'), $('#fNotes')]) {
   field.addEventListener('change', () => {
     if ($('#fRepeat').checked) updateRepeatSummary();
   });
 }
+// A tournament is flexible, so choosing one switches to all day (the user can switch it off to
+// give a start time).
+typeSelect.addEventListener('change', () => {
+  if (typeSelect.value === 'tournament') $('#fAllDay').checked = true;
+  showTimeFields();
+});
+$('#fAllDay').addEventListener('change', showTimeFields);
 $('#addSessionBtn').addEventListener('click', () => openForm(null));
 
 // The button above the calendar: add a session for today, without having to find the day first.
@@ -1044,6 +1066,8 @@ const settingsDialog = $('#settingsDialog');
 const settingsGuard = protectUnsavedChanges(settingsDialog, () => formState($('#profileForm')));
 $('#settingsClose').addEventListener('click', () => settingsDialog.close());
 $('#cancelProfile').addEventListener('click', () => settingsDialog.close());
+
+$('#goalRating').addEventListener('click', () => $('#settingsBtn').click());
 
 $('#settingsBtn').addEventListener('click', () => {
   $('#pName').value = profile.name;
