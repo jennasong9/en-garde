@@ -1,8 +1,9 @@
 import { setSwitchButtons } from './pill.js';
+import { showDialog } from './dialog-motion.js';
 import { pingToday } from './today-ping.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
-import { FEELINGS, PROMPTS, SORT_OPTIONS, appendPrompt, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
-import { parseIso, shiftAnchor, toIso } from './schedule.js';
+import { FEELINGS, SHORT_FIELDS, SORT_OPTIONS, entryParts, latestFocus, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
+import { SESSION_TYPES, formatTime, parseIso, sessionsOn, shiftAnchor, toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
 
 const stored = loadJson('journal', {});
@@ -31,6 +32,16 @@ function persist() {
   saveJson('journal', entries);
 }
 
+// The sessions on the Schedule, so an entry can say which one it is about.
+function savedSessions() {
+  const saved = loadJson('sessions', []);
+  return Array.isArray(saved) ? saved : [];
+}
+
+function sessionLabel(session) {
+  return SESSION_TYPES[session.type].label + (session.time ? ', ' + formatTime(session.time) : '');
+}
+
 function longDate(iso, withYear = false) {
   return parseIso(iso).toLocaleDateString(undefined, {
     weekday: 'long',
@@ -55,6 +66,7 @@ export function renderJournal() {
   $('#popupToggle').checked = popupMode;
   // There is one entry per day, so the button says whether it starts today's entry or reopens it.
   $('#journalAdd').textContent = entries[toIso(new Date())] ? "Edit today's entry" : "+ Write today's entry";
+  renderFocus();
   if (view === 'calendar') {
     $('#journalTitle').textContent = parseIso(anchorIso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     $('#journalHint').textContent = 'One entry per day.';
@@ -64,6 +76,24 @@ export function renderJournal() {
     $('#journalHint').textContent = 'One entry per day.';
     renderList();
   }
+}
+
+// The strip at the top reminds the fencer what they decided to focus on in their last entry.
+function renderFocus() {
+  const latest = latestFocus(entries);
+  $('#journalFocus').hidden = latest === null;
+  if (!latest) return;
+  $('#journalFocusText').textContent = latest.focus;
+  $('#journalFocusFrom').textContent = 'from ' + longDate(latest.date);
+}
+
+// Writes an entry's filled-in boxes into `box`, each under its bold label, one per line.
+function fillEntryText(box, entry) {
+  const parts = entryParts(entry);
+  box.replaceChildren(...parts.flatMap((part, index) => [
+    el('b', { text: part.label + ': ' }),
+    part.text + (index < parts.length - 1 ? '\n' : ''),
+  ]));
 }
 
 function renderViewSwitch() {
@@ -133,7 +163,7 @@ function renderCalendar() {
       cell.append(el('span', { class: 'chip feeling-' + entry.feeling },
         el('span', { class: 'chip-text', text: icon + ' ' + feelingLabel })));
     }
-    cell.addEventListener('click', () => openEntry(iso));
+    cell.addEventListener('click', () => openEntry(iso, cell));
     cells.push(cell);
   }
   $('#journalGrid').replaceChildren(...cells);
@@ -189,8 +219,11 @@ function entryCard(entry) {
   const card = el('article', { class: 'journal-entry feeling-' + entry.feeling, 'data-date': entry.date }, head);
   const times = writtenText(entry);
   if (times) card.append(el('p', { class: 'journal-entry-times', text: times }));
+  if (entry.sessionLabel) card.append(el('p', { class: 'journal-entry-session', text: entry.sessionLabel }));
+  const text = el('p', { class: 'journal-entry-text clamped' });
+  fillEntryText(text, entry);
   card.append(
-    el('p', { class: 'journal-entry-text clamped', text: entry.text }),
+    text,
     el('div', { class: 'journal-entry-actions' },
       toggle,
       el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', onclick: () => openEntry(entry.date) })));
@@ -326,8 +359,10 @@ function openEntryView(iso) {
   $('#entryViewTitle').textContent = longDate(iso, true);
   $('#entryViewFeeling').textContent = icon + ' ' + label;
   $('#entryViewFeeling').className = 'journal-entry-feeling feeling-' + entry.feeling;
-  $('#entryViewText').textContent = entry.text;
-  entryViewDialog.showModal();
+  $('#entryViewSession').hidden = !entry.sessionLabel;
+  $('#entryViewSession').textContent = entry.sessionLabel || '';
+  fillEntryText($('#entryViewText'), entry);
+  showDialog(entryViewDialog);
 }
 
 $('#popupToggle').addEventListener('change', (event) => {
@@ -356,47 +391,64 @@ function renderFeelingPicker() {
   }, el('span', { class: 'feeling-icon', text: info.icon }), info.label)));
 }
 
-$('#promptRow').replaceChildren(...PROMPTS.map((prompt) => el('button', {
-  class: 'prompt-chip',
-  type: 'button',
-  text: prompt,
-  onclick: () => {
-    const box = $('#jText');
-    box.value = appendPrompt(box.value, prompt);
-    box.focus();
-    box.setSelectionRange(box.value.length, box.value.length);
-  },
-})));
+$('#shortFields').replaceChildren(...SHORT_FIELDS.map((field) => el('label', { class: 'field short-field' },
+  field.label,
+  el('textarea', { id: 'j-' + field.key, rows: '2', maxlength: '300', placeholder: field.placeholder }))));
 
-function openEntry(iso) {
+// The choices for "Which session was it?": the sessions on that day's Schedule, and the one this
+// entry was saved with if it has since been removed.
+function fillSessionChoices(iso, entry) {
+  const sessions = sessionsOn(savedSessions(), iso).filter((session) => SESSION_TYPES[session.type]);
+  const choices = [el('option', { value: '', text: sessions.length === 0 ? 'No sessions on the Schedule this day' : 'Not about a particular session' })];
+  for (const session of sessions) choices.push(el('option', { value: session.id, text: sessionLabel(session) }));
+  const removed = entry && entry.sessionId && !sessions.some((session) => session.id === entry.sessionId);
+  if (removed) choices.push(el('option', { value: entry.sessionId, text: entry.sessionLabel + ' (removed from the Schedule)' }));
+  $('#jSession').replaceChildren(...choices);
+  // A day with exactly one session is that session, unless an entry already says otherwise.
+  $('#jSession').value = entry ? entry.sessionId || '' : sessions.length === 1 ? sessions[0].id : '';
+  $('#jSession').disabled = choices.length === 1 && sessions.length === 0;
+}
+
+// `origin` is the calendar date the pop-up grows out of, when it was opened from one.
+function openEntry(iso, origin = null) {
   const entry = entries[iso];
   dialogDate = iso;
   selectedFeeling = entry ? entry.feeling : '';
   confirmingDelete = false;
   $('#journalDialogTitle').textContent = (entry ? 'Edit entry — ' : 'New entry — ') + longDate(iso);
-  $('#jText').value = entry ? entry.text : '';
+  $('#jText').value = entry ? entry.text || '' : '';
+  for (const field of SHORT_FIELDS) $('#j-' + field.key).value = entry ? entry[field.key] || '' : '';
+  fillSessionChoices(iso, entry);
   $('#journalError').textContent = '';
   const deleteButton = $('#journalDelete');
   deleteButton.hidden = !entry;
   deleteButton.textContent = 'Delete';
   renderFeelingPicker();
-  journalDialog.showModal();
+  showDialog(journalDialog, origin);
   journalGuard.reset();
 }
 
 $('#journalForm').addEventListener('submit', (event) => {
   event.preventDefault();
   const entry = { feeling: selectedFeeling, text: $('#jText').value.trim() };
+  for (const field of SHORT_FIELDS) entry[field.key] = $('#j-' + field.key).value.trim();
   const problem = validateEntry(entry);
   if (problem) {
     $('#journalError').textContent = problem;
     return;
   }
   const before = entries[dialogDate];
+  // The chosen session is kept as its id and as a label, so the entry still reads right if the
+  // session is later removed from the Schedule.
+  const chosen = $('#jSession').value;
+  const session = savedSessions().find((other) => other.id === chosen);
+  entry.sessionId = chosen;
+  entry.sessionLabel = session && SESSION_TYPES[session.type] ? sessionLabel(session) : chosen && before ? before.sessionLabel : '';
   const now = new Date().toISOString();
+  const keys = ['feeling', 'text', 'sessionId', ...SHORT_FIELDS.map((field) => field.key)];
   if (!before) {
     entries[dialogDate] = { ...entry, createdAt: now, editedAt: now };
-  } else if (before.feeling !== entry.feeling || before.text !== entry.text) {
+  } else if (keys.some((key) => (before[key] || '') !== entry[key])) {
     entries[dialogDate] = { ...before, ...entry, editedAt: now };
   }
   persist();

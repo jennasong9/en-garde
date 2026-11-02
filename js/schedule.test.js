@@ -17,7 +17,7 @@ import {
   validateStep,
 } from './sessionsteps.js';
 import { archivedGoals, boardGoals, canArchive, dueStatus, isUrgent, matchesTag, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
-import { appendPrompt, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
+import { entryParts, latestFocus, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import {
   addTemplateToDays,
   addToHistory,
@@ -407,17 +407,31 @@ test('placeInCustomOrder moves an entry to a position and keeps hidden entries w
   equal(placeInCustomOrder(full, ['a', 'c', 'd'], 'a', 2), ['b', 'c', 'd', 'a']);
 });
 
-test('validateEntry needs a known feeling and some text, within the length limit', () => {
+test('validateEntry needs a known feeling and at least one filled-in box, within the length limits', () => {
   equal(validateEntry({ feeling: 'sharp', text: 'Good day' }), null);
+  equal(validateEntry({ feeling: 'sharp', wentWell: 'Lunges', text: '' }), null);
+  equal(validateEntry({ feeling: 'sharp', focus: 'Relax my arm' }), null);
   equal(validateEntry({ feeling: '', text: 'Good day' }) !== null, true);
   equal(validateEntry({ feeling: 'happy', text: 'Good day' }) !== null, true);
-  equal(validateEntry({ feeling: 'sharp', text: '   ' }) !== null, true);
+  equal(validateEntry({ feeling: 'sharp', wentWell: '  ', workOn: '', focus: '', text: '   ' }) !== null, true);
   equal(validateEntry({ feeling: 'sharp', text: 'x'.repeat(2001) }) !== null, true);
+  equal(validateEntry({ feeling: 'sharp', wentWell: 'x'.repeat(301) }) !== null, true);
 });
 
-test('appendPrompt puts a prompt on its own line under what is already written', () => {
-  equal(appendPrompt('', 'What needs work?'), 'What needs work?\n');
-  equal(appendPrompt('Felt good.\n', 'What needs work?'), 'Felt good.\n\nWhat needs work?\n');
+test('entryParts lists the filled-in boxes in form order, and old entries show as notes', () => {
+  equal(entryParts({ feeling: 'sharp', text: 'Old entry' }), [{ label: 'Notes', text: 'Old entry' }]);
+  equal(entryParts({ feeling: 'tired', workOn: ' Timing ', wentWell: 'Lunges', text: '' }),
+    [{ label: 'What went well', text: 'Lunges' }, { label: 'What to work on', text: 'Timing' }]);
+});
+
+test('latestFocus is the next-session focus of the most recent entry that has one', () => {
+  equal(latestFocus({}), null);
+  equal(latestFocus({ '2026-10-01': { feeling: 'sharp', text: 'x' } }), null);
+  equal(latestFocus({
+    '2026-10-01': { feeling: 'sharp', focus: 'Old focus' },
+    '2026-10-05': { feeling: 'tired', focus: '  Relax my arm ' },
+    '2026-10-09': { feeling: 'steady', text: 'No focus written' },
+  }), { date: '2026-10-05', focus: 'Relax my arm' });
 });
 
 // ---------- goals ----------

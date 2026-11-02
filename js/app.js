@@ -1,5 +1,6 @@
 import { burstConfetti } from './confetti.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
+import { showDialog } from './dialog-motion.js';
 import { initFoldableCards, setFoldSummary } from './foldable-cards.js';
 import { initHelp } from './help.js';
 import { setSwitchButtons, updateSwitch } from './pill.js';
@@ -276,7 +277,7 @@ function renderMonth() {
         el('span', { class: 'chip-text', text })));
     }
     if (count > MAX_CHIPS_PER_DAY) cell.append(el('span', { class: 'more', text: '+' + (count - MAX_CHIPS_PER_DAY) + ' more' }));
-    cell.addEventListener('click', () => openDay(iso));
+    cell.addEventListener('click', () => openDay(iso, '', cell));
     cells.push(cell);
   }
   $('#calGrid').replaceChildren(...cells);
@@ -686,14 +687,15 @@ function setStatus(message) {
 
 // Opens a day. With `presetTime` (from tapping an empty time slot) it goes straight to the
 // add-session form with that time filled in.
-function openDay(iso, presetTime = '') {
+// `origin` is the date the pop-up grows out of (month view only); other views pass nothing.
+function openDay(iso, presetTime = '', origin = null) {
   dialogDate = iso;
   formOpen = false;
   editingId = null;
   confirmingDeleteId = null;
   setStatus('');
   renderDay();
-  dayDialog.showModal();
+  showDialog(dayDialog, origin);
   if (presetTime) openForm(null, presetTime);
 }
 

@@ -154,6 +154,11 @@
           </div>
         </div>
       </div>
+      <div class="focus-strip" id="journalFocus" hidden>
+        <span class="focus-label">Next session focus</span>
+        <p class="focus-text" id="journalFocusText"></p>
+        <span class="focus-from" id="journalFocusFrom"></span>
+      </div>
       <div class="journal-toolbar">
         <div class="journal-toolbar-left">
           <div class="view-switch" id="journalViewSwitch" role="group" aria-label="Journal view"></div>
@@ -386,6 +391,7 @@
       <button class="icon-btn" id="entryViewClose" type="button" aria-label="Close">&#10005;</button>
     </div>
     <p class="journal-entry-feeling" id="entryViewFeeling"></p>
+    <p class="journal-entry-session" id="entryViewSession" hidden></p>
     <p class="journal-entry-text entry-view-text" id="entryViewText"></p>
     <div class="form-actions">
       <button class="btn ghost" id="entryViewEdit" type="button">Edit</button>
@@ -399,21 +405,17 @@
       <button class="icon-btn" id="journalClose" type="button" aria-label="Close">&#10005;</button>
     </div>
     <form id="journalForm" novalidate>
-      <div class="journal-layout">
-        <div class="journal-side">
-          <fieldset class="field">
-            <legend>How are you feeling?</legend>
-            <div class="feeling-picker" id="feelingPicker"></div>
-          </fieldset>
-          <div class="field">
-            <span>Need something to write about? Tap a prompt to add it.</span>
-            <div class="prompt-row" id="promptRow"></div>
-          </div>
-        </div>
-        <label class="field journal-main">Reflection
-          <textarea id="jText" class="journal-text" maxlength="2000" placeholder="How did your session go?"></textarea>
-        </label>
-      </div>
+      <fieldset class="field">
+        <legend>How are you feeling?</legend>
+        <div class="feeling-picker" id="feelingPicker"></div>
+      </fieldset>
+      <label class="field" id="sessionField">Which session was it?
+        <select id="jSession"></select>
+      </label>
+      <div id="shortFields"></div>
+      <label class="field">Notes (optional)
+        <textarea id="jText" class="journal-text" maxlength="2000" placeholder="Anything else: pain, energy, food, how a bout went..."></textarea>
+      </label>
       <p class="form-error" id="journalError" role="alert"></p>
       <div class="form-actions">
         <button class="btn danger" id="journalDelete" type="button" hidden>Delete</button>

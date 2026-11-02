@@ -567,20 +567,16 @@ textarea { min-height: 76px; resize: vertical; }
 .feeling-btn { min-height: 64px; padding: 6px 4px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); color: var(--text-dim); font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; }
 .feeling-btn .feeling-icon { font-size: 20px; color: var(--c); }
 .feeling-btn[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, var(--mix-base)); color: color-mix(in srgb, var(--c) 60%, var(--mix-text)); font-weight: 700; }
-.prompt-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.prompt-chip { min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
-.prompt-chip:hover { background: var(--sage-soft); color: var(--sage-deep); border-color: var(--sage); }
-.journal-text { min-height: 150px; }
-/* The entry box is the biggest thing in the writing pop-up: prompts on the left, entry on the right. */
-#journalDialog { width: min(960px, calc(100% - 24px)); }
-.journal-layout { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(0, 2fr); gap: 22px; align-items: stretch; }
-.journal-side { display: flex; flex-direction: column; gap: 16px; }
-.journal-main { display: flex; flex-direction: column; }
-.journal-main .journal-text { flex: 1; min-height: 360px; }
-@media (max-width: 760px) {
-  .journal-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-  .journal-main .journal-text { min-height: 200px; }
-}
+.journal-text { min-height: 110px; }
+#shortFields { display: grid; gap: 14px; margin-bottom: 14px; }
+.short-field textarea { min-height: 56px; }
+#journalDialog { width: min(560px, calc(100% - 24px)); }
+.journal-entry-session { margin: 0 0 6px; font-size: 13px; color: var(--text-dim); }
+.journal-entry-text b { font-weight: 700; }
+.focus-strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 10px 0 4px; padding: 12px 16px; border: 1px solid var(--sage); border-radius: var(--radius-s); background: var(--sage-soft); color: var(--sage-deep); }
+.focus-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.focus-text { margin: 0; flex: 1 1 200px; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.focus-from { font-size: 12px; opacity: .8; }
 .journal-entry { padding: 14px 16px; margin-top: 12px; border: 1px solid var(--border); border-left: 5px solid var(--c); border-radius: var(--radius-s); background: var(--raised); }
 .journal-entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 6px; }
 .journal-entry-date { font-size: 18px; font-weight: 600; }

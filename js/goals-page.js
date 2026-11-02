@@ -1,4 +1,5 @@
 import { burstConfetti } from './confetti.js';
+import { showDialog } from './dialog-motion.js';
 import { $, el, formState, protectUnsavedChanges } from './dom.js';
 import { setFolded } from './fold.js';
 import {
@@ -350,7 +351,7 @@ function openGoalForm(goal) {
   deleteButton.hidden = !goal;
   deleteButton.textContent = 'Delete';
   renderTagPicker();
-  goalDialog.showModal();
+  showDialog(goalDialog);
   goalGuard.reset();
   $('#gName').focus();
 }
