@@ -16,7 +16,7 @@ import {
   toggleStep,
   validateStep,
 } from './sessionsteps.js';
-import { archivedGoals, boardGoals, canArchive, dueStatus, isUrgent, matchesTag, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
+import { archivedGoals, boardGoals, canArchive, dueStatus, isUrgent, matchesTag, normalizeCardSize, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
 import { renderFocusStrip } from './focus-strip.js';
 import { entryParts, latestFocus, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import {
@@ -539,6 +539,16 @@ test('archived goals leave the board and list newest archive first', () => {
 
 const full = (id, date, extra = {}) => ({ id, date, type: 'bout', time: '18:00', mins: 75, location: 'Strip 3', notes: '', done: false, ...extra });
 const details = { type: 'bout', time: '18:00', mins: 75, location: 'Strip 3', notes: '' };
+
+test('a saved card size is Small, Medium or Large; the old slider pixels map to the nearest, and anything else is Medium', () => {
+  equal(normalizeCardSize('large'), 'large');
+  equal(normalizeCardSize(150), 'small');
+  equal(normalizeCardSize(250), 'medium');
+  equal(normalizeCardSize(420), 'large');
+  equal(normalizeCardSize('huge'), 'medium');
+  equal(normalizeCardSize(undefined), 'medium');
+  equal(normalizeCardSize(NaN), 'medium');
+});
 
 test('repeating an edited session lists the other matching days and leaves its own day out', () => {
   equal(extraRepeatDates('2026-10-05', '2026-10-19', [1, 3]), ['2026-10-07', '2026-10-12', '2026-10-14', '2026-10-19']);

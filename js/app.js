@@ -4,6 +4,7 @@ import { showDialog } from './dialog-motion.js';
 import { initFoldableCards, setFoldSummary } from './foldable-cards.js';
 import { renderFocusStrip } from './focus-strip.js';
 import { initHelp } from './help.js';
+import { showToast } from './toast.js';
 import { setSwitchButtons, updateSwitch } from './pill.js';
 import { enableSwitchDrag } from './switch-drag.js';
 import { pingToday } from './today-ping.js';
@@ -1139,6 +1140,13 @@ enableSwitchDrag();
 // ---------- pages ----------
 const PAGES = ['schedule', 'routines', 'nutrition', 'journal', 'goals'];
 
+// The "Open Journal" button on the Schedule's focus strip: goes to the Journal and says so, with a
+// way back, since the page changes under the user.
+function openJournal() {
+  location.hash = '#journal';
+  showToast('Opened your Journal.', { actionLabel: 'Go back', onAction: () => { location.hash = '#schedule'; } });
+}
+
 function showPage() {
   const requested = location.hash.slice(1);
   const page = PAGES.includes(requested) ? requested : 'schedule';
@@ -1148,14 +1156,12 @@ function showPage() {
     $('#nav' + capitalized).setAttribute('aria-current', name === page ? 'page' : 'false');
   }
   updateSwitch($('.page-nav'), '[aria-current="page"]');
-  // "Next meals" only shows where it is useful: on the Nutrition page.
-  $('#miniMeals').hidden = page !== 'nutrition';
   renderNextMeals();
   if (page === 'schedule') {
     // The Journal's latest "next session focus", with a way to get to the Journal.
     const journal = loadJson('journal', {});
     renderFocusStrip($('#scheduleFocus'), journal !== null && typeof journal === 'object' ? journal : {},
-      { openJournal: () => { location.hash = '#journal'; } });
+      { openJournal });
   }
   if (page === 'nutrition') {
     renderNutrition();

@@ -130,9 +130,10 @@
           <input type="checkbox" role="switch" id="hideCompleted" class="switch-toggle">
         </label>
         <span class="goal-hidden-note" id="goalHiddenNote"></span>
-        <label class="goal-size">Card size
-          <input type="range" id="goalCardSize" min="140" max="420" step="10" aria-label="Goal card size">
-        </label>
+        <div class="goal-size">
+          <span id="goalSizeLabel">Card size</span>
+          <div class="view-switch" id="goalSizeSwitch" role="group" aria-labelledby="goalSizeLabel"></div>
+        </div>
       </div>
       <div class="goal-board" id="goalBoard"></div>
       <section class="goal-archive collapsed" id="goalArchive" aria-label="Archive">

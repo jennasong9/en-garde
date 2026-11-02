@@ -142,6 +142,8 @@ h1, h2, h3 {
 .help-btn:hover, .help-btn[aria-expanded="true"] { background: var(--sage-soft); border-color: var(--sage); color: var(--sage-deep); }
 .help-panel { display: none; }
 .tip-toast { position: fixed; left: 16px; bottom: 16px; z-index: 50; max-width: min(340px, calc(100vw - 32px)); padding: 12px 16px; border: 1px solid var(--sage); border-radius: 12px; background: var(--surface, #fff); color: var(--text); box-shadow: 0 6px 24px rgba(0, 0, 0, .18); font-size: 14px; line-height: 1.45; cursor: pointer; opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease; }
+.tip-toast p { margin: 0; }
+.tip-toast .toast-action { margin-top: 8px; padding: 0; font-weight: 700; }
 .tip-toast ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .tip-toast li { position: relative; padding-left: 18px; }
 .tip-toast li::before { content: ''; position: absolute; left: 2px; top: .5em; width: 7px; height: 7px; border-radius: 50%; background: var(--sage); }
@@ -223,9 +225,10 @@ textarea { min-height: 76px; resize: vertical; }
 .mini-meals:hover { background: var(--sage-soft); }
 .mini-meals-title { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
 .mini-meals-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; font-size: 13px; line-height: 1.35; }
-.mini-meals-list li { display: flex; justify-content: space-between; gap: 10px; }
-.mini-meals-list b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mini-meals-list span { color: var(--text-dim); white-space: nowrap; }
+.mini-meals { max-width: min(320px, 100%); }
+.mini-meals-list li { display: flex; gap: 10px; min-width: 0; }
+.mini-meals-list b { flex: 0 0 auto; font-weight: 700; white-space: nowrap; }
+.mini-meals-list span { flex: 1 1 auto; min-width: 0; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-meals-empty { color: var(--text-dim); }
 .settings-btn { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 50%; border: 1px solid var(--sage); background: var(--surface); color: var(--sage-deep); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .settings-btn:hover { background: var(--sage-soft); }
@@ -508,7 +511,6 @@ textarea { min-height: 76px; resize: vertical; }
 :root[data-theme="dark"] .goal-tag-fitness { --pin: #e8c862; --paper: #453f23; }
 .goal-options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-bottom: 4px; }
 .goal-size { display: flex; align-items: center; gap: 10px; margin-left: auto; font-size: 14px; font-weight: 500; }
-.goal-size input { width: 140px; accent-color: var(--sage-deep); cursor: pointer; }
 .goal-hidden-note { font-size: 13px; color: var(--text-dim); }
 .goal-card {
   position: relative;

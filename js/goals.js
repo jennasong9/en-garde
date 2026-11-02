@@ -97,3 +97,19 @@ export function isUrgent(status) {
   if (status.kind === 'overdue' || status.kind === 'today') return true;
   return status.kind === 'upcoming' && status.days <= URGENT_DAYS;
 }
+
+// The three goal card sizes: the smallest width a card gets (cards then stretch to fill the row).
+export const CARD_SIZES = {
+  small: { label: 'Small', width: 160 },
+  medium: { label: 'Medium', width: 250 },
+  large: { label: 'Large', width: 380 },
+};
+
+// What was saved as the card size (a name, or the number of pixels the old slider saved) as one of
+// the three sizes; anything else is Medium.
+export function normalizeCardSize(saved) {
+  if (typeof saved === 'string' && CARD_SIZES[saved]) return saved;
+  if (typeof saved !== 'number' || !Number.isFinite(saved)) return 'medium';
+  const names = Object.keys(CARD_SIZES);
+  return names.reduce((best, name) => (Math.abs(CARD_SIZES[name].width - saved) < Math.abs(CARD_SIZES[best].width - saved) ? name : best));
+}

@@ -3,6 +3,7 @@ import { showDialog } from './dialog-motion.js';
 import { $, el, formState, protectUnsavedChanges } from './dom.js';
 import { setFolded } from './fold.js';
 import {
+  CARD_SIZES,
   PROGRESS_STEPS,
   TAGS,
   archivedGoals,
@@ -11,11 +12,13 @@ import {
   dueStatus,
   isUrgent,
   matchesTag,
+  normalizeCardSize,
   stepFromPosition,
   tapStep,
   validateGoal,
   visibleGoals,
 } from './goals.js';
+import { setSwitchButtons } from './pill.js';
 import { makeId, parseIso, toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
 
@@ -363,24 +366,25 @@ $('#goalArchiveToggle').addEventListener('click', () => {
   setFolded(archive, $('#goalArchiveToggle'), !archive.classList.contains('collapsed'));
 });
 
-// How big the goal cards are, which also sets how many fit on a row. Remembered on this device.
-const MIN_CARD_SIZE = 140;
-const MAX_CARD_SIZE = 420;
-const DEFAULT_CARD_SIZE = 250;
-const storedSize = loadJson('goalCardSize', DEFAULT_CARD_SIZE);
-let cardSize = Number.isFinite(storedSize) ? Math.max(MIN_CARD_SIZE, Math.min(MAX_CARD_SIZE, storedSize)) : DEFAULT_CARD_SIZE;
+// How big the goal cards are (Small, Medium or Large), which also sets how many fit on a row.
+// Remembered on this device.
+let cardSize = normalizeCardSize(loadJson('goalCardSize', 'medium'));
 
 function applyCardSize() {
-  $('#goalBoard').style.setProperty('--card-min', cardSize + 'px');
-  $('#goalCardSize').value = String(cardSize);
+  $('#goalBoard').style.setProperty('--card-min', CARD_SIZES[cardSize].width + 'px');
+  setSwitchButtons($('#goalSizeSwitch'), Object.entries(CARD_SIZES).map(([name, info]) => el('button', {
+    class: 'view-btn',
+    type: 'button',
+    text: info.label,
+    'aria-pressed': String(name === cardSize),
+    onclick: () => {
+      cardSize = name;
+      saveJson('goalCardSize', cardSize);
+      applyCardSize();
+    },
+  })), '[aria-pressed="true"]');
 }
 applyCardSize();
-
-$('#goalCardSize').addEventListener('input', (event) => {
-  cardSize = Number(event.target.value);
-  applyCardSize();
-  saveJson('goalCardSize', cardSize);
-});
 
 $('#hideCompleted').addEventListener('change', (event) => {
   hideCompleted = event.target.checked;
