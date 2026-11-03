@@ -33,6 +33,7 @@ import {
 } from './meals.js';
 import { makeId, formatTime } from './schedule.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
+import { initExportPlan } from './export-plan.js';
 import { renderNextMeals } from './next-meals.js';
 import { loadJson, saveJson } from './storage.js';
 
@@ -655,6 +656,8 @@ $('#savePlanForm').addEventListener('submit', (event) => {
   savePlanDialog.close();
   showMealStatus('Saved "' + plan.name + '" (' + planSummary(plan) + ').');
 });
+
+initExportPlan(() => meals, showMealStatus);
 
 $('#loadPlanBtn').addEventListener('click', () => {
   confirming = null;

@@ -792,3 +792,29 @@ form h3 { font-size: 17px; }
   .next-when { min-width: 0; }
   .field-row { flex-direction: column; }
 }
+
+/* ===== Export meal plan ===== */
+.export-formats { display: grid; gap: 8px; }
+.export-format { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); cursor: pointer; }
+.export-format:has(input:checked) { border-color: var(--sage); background: var(--sage-soft); }
+.export-format input { margin-top: 4px; accent-color: var(--sage-deep); }
+.export-format span { display: grid; gap: 2px; }
+.export-format small { color: var(--text-dim); font-size: 13px; }
+#printSheet { display: none; }
+@media print {
+  body.printing-plan > *:not(#printSheet) { display: none !important; }
+  body.printing-plan #printSheet { display: block; color: #000; background: #fff; font-size: 12pt; }
+  body.printing-plan { background: #fff; }
+  #printSheet h1 { font-size: 20pt; margin: 0 0 12pt; }
+  #printSheet h2 { font-size: 13pt; margin: 12pt 0 4pt; border-bottom: 1px solid #999; }
+  #printSheet ul { margin: 0; padding-left: 16pt; }
+  #printSheet li { margin-bottom: 4pt; }
+  #printSheet .print-meals { list-style: none; padding-left: 0; }
+  #printSheet .print-meals li { display: flex; align-items: flex-start; gap: 8pt; }
+  #printSheet .print-box { display: inline-block; flex: 0 0 auto; width: 11pt; height: 11pt; margin-top: 1.5pt; border: 1.2pt solid #000; border-radius: 2pt; }
+  #printSheet .print-extra { margin: 0 0 4pt; font-size: 11pt; }
+  #printSheet .print-water { display: flex; align-items: center; gap: 6pt; margin-top: 6pt; font-size: 11pt; }
+  #printSheet .print-water .print-box { margin-top: 0; border-radius: 50%; }
+  #printSheet section { break-inside: avoid; }
+  #printSheet .print-numbers { color: #444; font-size: 10pt; }
+}

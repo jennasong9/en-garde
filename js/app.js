@@ -4,6 +4,7 @@ import { showDialog } from './dialog-motion.js';
 import { initFoldableCards, setFoldSummary } from './foldable-cards.js';
 import { renderFocusStrip } from './focus-strip.js';
 import { initHelp } from './help.js';
+import { initReminders } from './reminder-runner.js';
 import { showToast } from './toast.js';
 import { setSwitchButtons, updateSwitch } from './pill.js';
 import { enableSwitchDrag } from './switch-drag.js';
@@ -1135,6 +1136,7 @@ initTheme();
 initFont();
 initFoldableCards();
 initHelp();
+initReminders();
 enableSwitchDrag();
 
 // ---------- pages ----------

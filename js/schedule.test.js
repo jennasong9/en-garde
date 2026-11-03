@@ -18,6 +18,9 @@ import {
 } from './sessionsteps.js';
 import { archivedGoals, boardGoals, canArchive, dueStatus, isUrgent, matchesTag, normalizeCardSize, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
 import { renderFocusStrip } from './focus-strip.js';
+import { planAsSheet, planAsText, planDays } from './mealexport.js';
+import { DEFAULT_REMINDERS, dueMeals, mealReminderText, normalizeReminders, normalizeSent, waterDue, waterReminderText } from './reminders.js';
+import { crc32, sheetToXlsx, zipStored } from './xlsx.js';
 import { entryParts, latestFocus, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import {
   addTemplateToDays,
@@ -453,6 +456,190 @@ test('the focus strip shows the latest focus, hides when there is none, and has 
   equal(button.textContent, 'Open Journal');
   button.click();
   equal(opened, 1);
+});
+
+// ---------- exporting the meal plan ----------
+const exportMeal = (id, day, name, extra = {}) => ({ id, day, name, desc: '', time: '', kcal: null, protein: null, carb: null, fat: null, prepped: false, ...extra });
+
+test('planDays lists Monday to Sunday with each day\'s meals in order, including empty days', () => {
+  const days = planDays([
+    exportMeal('a', 0, 'Sunday brunch'),
+    exportMeal('b', 1, 'Dinner', { time: '18:30' }),
+    exportMeal('c', 1, 'Breakfast', { time: '07:00' }),
+  ]);
+  equal(days.map((day) => day.name), ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
+  equal(days[0].meals.map((meal) => meal.name), ['Breakfast', 'Dinner']);
+  equal(days[1].meals, []);
+  equal(days[6].meals.map((meal) => meal.name), ['Sunday brunch']);
+});
+
+test('planAsText writes each day with its meals, time, contents, calories and macros, and says so for an empty day', () => {
+  const text = planAsText('My plan', [
+    exportMeal('a', 1, 'Breakfast', { time: '07:00', desc: 'Oats and banana', kcal: 450, protein: 20, carb: 70, fat: 10 }),
+    exportMeal('b', 1, 'Snack', { kcal: 150 }),
+  ]);
+  const lines = text.split('\n');
+  equal(lines[0], 'My plan');
+  equal(text.includes('Monday'), true);
+  equal(text.includes('Breakfast, 7:00 AM'), true);
+  equal(text.includes('Oats and banana'), true);
+  equal(text.includes('450 kcal'), true);
+  equal(text.includes('protein 20 g'), true);
+  equal(text.includes('Day total: 600 kcal'), true);
+  equal(text.includes('Tuesday\n  No meals planned'), true);
+});
+
+// A sheet cell's text or number, for comparing whole rows.
+const sheetValues = (sheet) => sheet.rows.map((row) => row.map((cell) => (cell === null ? '' : cell.value)));
+
+test('planAsSheet has a bold header and one row per meal, in week order, with blanks for missing numbers', () => {
+  const sheet = planAsSheet([
+    exportMeal('a', 2, 'Lunch', { desc: 'Rice, chicken', kcal: 600 }),
+    exportMeal('b', 1, 'Breakfast', { time: '07:00' }),
+  ]);
+  equal(sheetValues(sheet), [
+    ['Day', 'Meal', 'Time', "What's in it", 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'],
+    ['Monday', 'Breakfast', '7:00 AM', '', '', '', '', ''],
+    ['Tuesday', 'Lunch', '', 'Rice, chicken', 600, '', '', ''],
+  ]);
+  equal(sheet.rows[0].every((cell) => cell.bold), true);
+  equal(sheet.rows[1][1].bold, false);
+  equal(sheet.rows[2][4].value, 600);
+});
+
+test('planAsSheet merges a day\'s cells down its meals, and leaves a day with one meal alone', () => {
+  const sheet = planAsSheet([
+    exportMeal('a', 1, 'Breakfast', { time: '07:00' }),
+    exportMeal('b', 1, 'Lunch', { time: '12:00' }),
+    exportMeal('c', 1, 'Dinner', { time: '18:30' }),
+    exportMeal('d', 3, 'Snack'),
+  ]);
+  equal(sheetValues(sheet).slice(1).map((row) => row.slice(0, 2).join('|')),
+    ['Monday|Breakfast', '|Lunch', '|Dinner', 'Wednesday|Snack']);
+  equal(sheet.merges, ['A2:A4']);
+  equal(sheet.rows[1][0].bold, true);
+});
+
+test('the daily macro targets and the water goal are added to the text and the spreadsheet only when asked for', () => {
+  const meals = [exportMeal('a', 1, 'Breakfast')];
+  const extras = { targets: { protein: 150, carb: 250, fat: 70 }, glassGoal: 8 };
+  const plain = planAsText('Plan', meals);
+  equal(plain.includes('Daily macro targets'), false);
+  equal(plain.includes('Water'), false);
+
+  const text = planAsText('Plan', meals, extras);
+  equal(text.includes('Daily macro targets: protein 150 g, carbs 250 g, fat 70 g (about 2230 kcal)'), true);
+  equal(text.includes('Water: 8 glasses a day'), true);
+
+  const only = planAsText('Plan', meals, { glassGoal: 6 });
+  equal(only.includes('Water: 6 glasses a day'), true);
+  equal(only.includes('Daily macro targets'), false);
+
+  // A small separate table of daily targets comes first (bold headings), then a blank row, then the meals.
+  const sheet = planAsSheet(meals, extras);
+  equal(sheetValues(sheet).slice(0, 4), [
+    ['Daily targets', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)', 'Water (glasses)'],
+    ['Every day', 2230, 150, 250, 70, 8],
+    [],
+    ['Day', 'Meal', 'Time', "What's in it", 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'],
+  ]);
+  equal(sheet.rows[0].every((cell) => cell.bold), true);
+  equal(sheet.rows[1][0].bold, true);
+  equal(sheet.rows.length, 5);
+  equal(sheetValues(planAsSheet(meals, { glassGoal: 6 })).slice(0, 2), [['Daily targets', 'Water (glasses)'], ['Every day', 6]]);
+  equal(sheetValues(planAsSheet(meals, { targets: { protein: 100, carb: null, fat: null } })).slice(0, 2),
+    [['Daily targets', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'], ['Every day', 400, 100, '', '']]);
+  equal(planAsSheet(meals).rows.length, 2);
+});
+
+test('crc32 matches the standard check value', () => {
+  equal(crc32(new TextEncoder().encode('123456789')), 0xCBF43926);
+  equal(crc32(new Uint8Array(0)), 0);
+});
+
+test('zipStored makes a zip with every file named and stored as given', () => {
+  const zip = zipStored([{ name: 'a.txt', text: 'hello' }, { name: 'dir/b.xml', text: '<x/>' }]);
+  const view = new DataView(zip.buffer);
+  equal(view.getUint32(0, true), 0x04034b50);
+  const text = new TextDecoder().decode(zip);
+  equal(text.includes('a.txt') && text.includes('dir/b.xml') && text.includes('hello'), true);
+  // The last 22 bytes are the end record, which says how many files there are.
+  equal(view.getUint16(zip.length - 22 + 10, true), 2);
+});
+
+test('sheetToXlsx writes a workbook with bold styles, the text of the cells and the merged ranges', () => {
+  const bytes = sheetToXlsx(planAsSheet([exportMeal('a', 1, 'Breakfast & oats'), exportMeal('b', 1, 'Lunch')]));
+  const text = new TextDecoder().decode(bytes);
+  equal(text.includes('xl/worksheets/sheet1.xml'), true);
+  equal(text.includes('<b/>'), true);
+  equal(text.includes('Breakfast &amp; oats'), true);
+  equal(text.includes('<mergeCell ref="A2:A3"/>'), true);
+});
+
+// ---------- reminders ----------
+// 2026-11-03 is a Tuesday (day 2).
+const at = (hours, minutes = 0) => new Date(2026, 10, 3, hours, minutes);
+const onSettings = { ...DEFAULT_REMINDERS, meals: true, water: true };
+const noneSent = { date: '2026-11-03', keys: [], waterAt: 0 };
+
+test('normalizeReminders starts everything off and fixes anything unusable', () => {
+  equal(normalizeReminders({}), DEFAULT_REMINDERS);
+  equal(DEFAULT_REMINDERS.meals, false);
+  equal(DEFAULT_REMINDERS.water, false);
+  const fixed = normalizeReminders({ meals: 'yes', water: true, leadMinutes: 9999, waterEveryHours: 0, waterFrom: 'noon', waterTo: '07:00' });
+  equal(fixed.meals, false);
+  equal(fixed.water, true);
+  equal(fixed.leadMinutes, DEFAULT_REMINDERS.leadMinutes);
+  equal(fixed.waterEveryHours, DEFAULT_REMINDERS.waterEveryHours);
+  equal([fixed.waterFrom, fixed.waterTo], [DEFAULT_REMINDERS.waterFrom, DEFAULT_REMINDERS.waterTo]);
+  equal(normalizeReminders({ leadMinutes: 30, waterEveryHours: 3, waterFrom: '09:00', waterTo: '21:30' }).waterTo, '21:30');
+  equal(normalizeReminders(null), DEFAULT_REMINDERS);
+});
+
+test('a meal reminder is due from the lead time until the meal time, today only, and only once', () => {
+  const lunch = exportMeal('l', 2, 'Lunch', { time: '12:30', desc: 'Chicken and rice' });
+  equal(dueMeals([lunch], at(12, 14), onSettings, noneSent), []);
+  equal(dueMeals([lunch], at(12, 15), onSettings, noneSent).map((due) => due.meal.name), ['Lunch']);
+  equal(dueMeals([lunch], at(12, 30), onSettings, noneSent).length, 1);
+  equal(dueMeals([lunch], at(12, 31), onSettings, noneSent), []);
+  equal(dueMeals([lunch], at(12, 20), onSettings, noneSent)[0].minutesAway, 10);
+  const key = dueMeals([lunch], at(12, 20), onSettings, noneSent)[0].key;
+  equal(dueMeals([lunch], at(12, 25), onSettings, { ...noneSent, keys: [key] }), []);
+});
+
+test('no meal reminder for a prepped meal, another day, or when meal reminders are off, and meals without a time use the typical time', () => {
+  const lunch = exportMeal('l', 2, 'Lunch', { time: '12:30' });
+  equal(dueMeals([{ ...lunch, prepped: true }], at(12, 20), onSettings, noneSent), []);
+  equal(dueMeals([{ ...lunch, day: 3 }], at(12, 20), onSettings, noneSent), []);
+  equal(dueMeals([lunch], at(12, 20), { ...onSettings, meals: false }, noneSent), []);
+  equal(dueMeals([exportMeal('x', 2, 'Snack')], at(12, 20), onSettings, noneSent), []);
+  equal(dueMeals([exportMeal('d', 2, 'Dinner')], at(18, 20), onSettings, noneSent).length, 1);
+  equal(dueMeals([lunch], at(12, 20), { ...onSettings, leadMinutes: 5 }, noneSent), []);
+});
+
+test('a water reminder is due inside the chosen hours, below the goal, and after the gap since the last one', () => {
+  const status = { glasses: 3, goal: 8 };
+  equal(waterDue(at(10), onSettings, status, noneSent), true);
+  equal(waterDue(at(7, 59), onSettings, status, noneSent), false);
+  equal(waterDue(at(20), onSettings, status, noneSent), false);
+  equal(waterDue(at(10), onSettings, { glasses: 8, goal: 8 }, noneSent), false);
+  equal(waterDue(at(10), { ...onSettings, water: false }, status, noneSent), false);
+  const lastAt = at(10).getTime();
+  equal(waterDue(at(11, 59), onSettings, status, { ...noneSent, waterAt: lastAt }), false);
+  equal(waterDue(at(12), onSettings, status, { ...noneSent, waterAt: lastAt }), true);
+});
+
+test('normalizeSent keeps today\'s record and starts fresh on a new day', () => {
+  const saved = { date: '2026-11-03', keys: ['a'], waterAt: 5 };
+  equal(normalizeSent(saved, '2026-11-03'), saved);
+  equal(normalizeSent(saved, '2026-11-04'), { date: '2026-11-04', keys: [], waterAt: 0 });
+  equal(normalizeSent(null, '2026-11-04'), { date: '2026-11-04', keys: [], waterAt: 0 });
+});
+
+test('reminder text names the meal and how soon it is, and the glasses so far', () => {
+  equal(mealReminderText({ meal: exportMeal('l', 2, 'Lunch', { desc: 'Chicken and rice' }), minutesAway: 15 }), 'Lunch in 15 min: Chicken and rice');
+  equal(mealReminderText({ meal: exportMeal('l', 2, 'Lunch'), minutesAway: 0 }), 'Lunch is now');
+  equal(waterReminderText({ glasses: 3, goal: 8 }), 'Time for a glass of water (3 of 8 today)');
 });
 
 // ---------- goals ----------

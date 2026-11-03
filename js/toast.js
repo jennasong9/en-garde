@@ -20,8 +20,9 @@ export function hideToast() {
 }
 
 // `content` is a sentence, or a list of short steps. With `actionLabel` the pop-up gets a button
-// that calls `onAction` and puts the pop-up away. `onClose` runs whenever the pop-up goes away.
-export function showToast(content, { actionLabel = '', onAction = null, onClose = null } = {}) {
+// that calls `onAction` and puts the pop-up away. `onClose` runs whenever the pop-up goes away, and
+// `ms` is how long it stays.
+export function showToast(content, { actionLabel = '', onAction = null, onClose = null, ms = SHOW_MS } = {}) {
   hideToast();
   toast = document.createElement('div');
   toast.className = 'tip-toast';
@@ -47,5 +48,5 @@ export function showToast(content, { actionLabel = '', onAction = null, onClose 
   onHide = onClose;
   const shown = toast;
   requestAnimationFrame(() => requestAnimationFrame(() => shown.classList.add('show')));
-  fadeTimer = setTimeout(hideToast, SHOW_MS);
+  fadeTimer = setTimeout(hideToast, ms);
 }

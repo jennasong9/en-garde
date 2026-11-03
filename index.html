@@ -245,6 +245,7 @@
           <div class="plan-actions">
             <button class="btn ghost" id="expandAllBtn" type="button">Collapse all</button>
             <button class="btn ghost" id="loadPlanBtn" type="button">Load saved meal plan</button>
+            <button class="btn ghost" id="exportPlanBtn" type="button">Export meal plan</button>
             <button class="btn" id="savePlanBtn" type="button">Save weekly meal plan</button>
           </div>
         </div>
@@ -506,6 +507,31 @@
     </form>
   </dialog>
 
+  <dialog id="exportPlanDialog" aria-labelledby="exportPlanTitle">
+    <div class="dialog-head">
+      <h2 id="exportPlanTitle">Export meal plan</h2>
+      <button class="icon-btn" id="exportPlanClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="exportPlanForm" novalidate>
+      <fieldset class="field">
+        <legend>Format</legend>
+        <div class="export-formats" id="exportFormats"></div>
+      </fieldset>
+      <fieldset class="field">
+        <legend>Also include</legend>
+        <div class="export-formats">
+          <label class="export-format"><input type="checkbox" id="exportTargets"><span><b>Daily macro targets</b><small id="exportTargetsNote"></small></span></label>
+          <label class="export-format"><input type="checkbox" id="exportWater"><span><b>Hydration tracking</b><small id="exportWaterNote"></small></span></label>
+        </div>
+      </fieldset>
+      <p class="series-note" id="exportSummary"></p>
+      <div class="form-actions">
+        <button class="btn ghost" id="exportPlanCancel" type="button">Cancel</button>
+        <button class="btn" id="exportGo" type="submit">Export</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="loadPlanDialog" aria-labelledby="loadPlanTitle">
     <div class="dialog-head">
       <h2 id="loadPlanTitle">Load saved meal plan</h2>
@@ -567,6 +593,41 @@
           <button type="button" role="radio" class="font-option" data-font="mono">Mono</button>
         </div>
       </div>
+    </section>
+
+    <section class="settings-section" aria-labelledby="remindersTitle">
+      <h3 id="remindersTitle">Reminders</h3>
+      <p class="tracker-help">Reminders pop up while En Garde is open in a browser tab.</p>
+      <label class="switch-row" for="remMeals">
+        <span>Meal reminders</span>
+        <input type="checkbox" role="switch" id="remMeals" class="switch-toggle">
+      </label>
+      <label class="field" id="remLeadField">Remind me before a meal
+        <select id="remLead"></select>
+      </label>
+      <label class="switch-row" for="remWater">
+        <span>Water reminders</span>
+        <input type="checkbox" role="switch" id="remWater" class="switch-toggle">
+      </label>
+      <div id="remWaterOptions">
+        <label class="field">Every
+          <select id="remEvery"></select>
+        </label>
+        <div class="field-row">
+          <label class="field">From
+            <input type="time" id="remFrom">
+          </label>
+          <label class="field">Until
+            <input type="time" id="remTo">
+          </label>
+        </div>
+      </div>
+      <label class="switch-row" for="remNotify">
+        <span>Also show a notification</span>
+        <input type="checkbox" role="switch" id="remNotify" class="switch-toggle">
+      </label>
+      <p class="series-note" id="remNote" role="status"></p>
+      <button class="btn ghost" id="remTest" type="button">Send a test reminder</button>
     </section>
 
     <section class="settings-section" aria-labelledby="linksTitle">

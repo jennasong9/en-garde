@@ -21,6 +21,18 @@ function currentGlasses() {
   return glassesToday(hydration, toIso(new Date()));
 }
 
+// Today's glasses and the daily goal, for the water reminders.
+export function waterStatus() {
+  return { glasses: currentGlasses(), goal: hydration.goal };
+}
+
+// Adds one glass (the "+1 glass" button on a water reminder). Confetti pops near the reminder when
+// that glass reaches the goal.
+export function addGlass() {
+  const glasses = currentGlasses();
+  if (glasses < hydration.goal) setGlasses(glasses + 1, 120, window.innerHeight - 80);
+}
+
 export function renderHydration() {
   const glasses = currentGlasses();
   $('#drops').replaceChildren(...Array.from({ length: hydration.goal }, (_, index) => el('button', {
