@@ -244,9 +244,14 @@
           <div class="head-title"><h2>Weekly meal plan</h2><button class="help-btn" type="button" data-help="mealsHelp" aria-expanded="false" aria-label="Tips for the meal plan">?</button></div>
           <div class="plan-actions">
             <button class="btn ghost" id="expandAllBtn" type="button">Collapse all</button>
-            <button class="btn ghost" id="loadPlanBtn" type="button">Load saved meal plan</button>
-            <button class="btn ghost" id="exportPlanBtn" type="button">Export meal plan</button>
-            <button class="btn" id="savePlanBtn" type="button">Save weekly meal plan</button>
+            <div class="menu-wrap" id="planMenu">
+              <button class="btn ghost menu-btn" type="button">Plan options <span class="chevron" aria-hidden="true"></span></button>
+              <div class="menu-list" hidden>
+                <button class="menu-item" id="savePlanBtn" type="button">Save weekly meal plan</button>
+                <button class="menu-item" id="loadPlanBtn" type="button">Load saved meal plan</button>
+                <button class="menu-item" id="exportPlanBtn" type="button">Export meal plan</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="help-panel" id="mealsHelp"><ul><li>Tap a meal to edit or copy it</li><li>Tick a meal once it's prepped</li><li>Tap a day's heading to fold it away</li><li>The plan repeats every week</li></ul></div>

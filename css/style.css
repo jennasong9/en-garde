@@ -646,8 +646,15 @@ textarea { min-height: 76px; resize: vertical; }
 .meal-day-toggle[aria-expanded="true"] .chevron { margin-top: 3px; transform: rotate(-135deg); }
 .meal-day.collapsed, .meal-day.expanding { align-self: start; }
 @media (prefers-reduced-motion: reduce) { .fold, .chevron { transition: none; } }
-.meal-day-links { display: flex; flex-direction: column; }
-.meal-day-links:empty { display: none; }
+.meal-day-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.meal-day-actions { display: flex; align-items: center; gap: 4px; }
+.icon-btn.small { width: 32px; height: 32px; font-size: 18px; line-height: 1; }
+.menu-wrap { position: relative; display: inline-block; }
+.menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; display: flex; flex-direction: column; min-width: max-content; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface); box-shadow: 0 8px 22px rgba(40, 53, 43, .22); }
+.menu-item { min-height: 40px; padding: 0 14px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--sage-soft); }
+.menu-btn .chevron { display: inline-block; margin-left: 6px; margin-top: -3px; }
+.menu-wrap.open .menu-btn .chevron { margin-top: 3px; transform: rotate(-135deg); }
 .meal-day-summary { font-size: 12px; color: var(--text-dim); }
 .link-btn.small { min-height: 32px; padding: 0; font-size: 12px; text-align: left; }
 .meal-card { display: flex; gap: 6px; align-items: flex-start; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface); }
@@ -659,7 +666,6 @@ textarea { min-height: 76px; resize: vertical; }
 .meal-card.prepped .meal-main b { text-decoration: line-through; color: var(--text-dim); }
 .meal-meta { font-size: 12px; color: var(--sage-deep); font-weight: 500; }
 .meal-desc { font-size: 13px; color: var(--text-dim); overflow-wrap: anywhere; }
-.add-meal { align-self: flex-start; margin-top: auto; }
 .meal-day.drop-target { border-color: var(--sage-deep); background: var(--sage-soft); box-shadow: 0 0 0 2px var(--sage); }
 .meal-card.drag-source { opacity: .4; }
 .drop-line { height: 4px; margin: -2px 0; border-radius: 2px; background: var(--sage-deep); pointer-events: none; }
@@ -817,4 +823,10 @@ form h3 { font-size: 17px; }
   #printSheet .print-water .print-box { margin-top: 0; border-radius: 50%; }
   #printSheet section { break-inside: avoid; }
   #printSheet .print-numbers { color: #444; font-size: 10pt; }
+}
+
+/* With a mouse, History's remove buttons only show when the entry is pointed at; on a touch screen they stay visible. */
+@media (hover: hover) {
+  .history-remove { opacity: 0; transition: opacity .15s ease; }
+  .history-item:hover .history-remove, .history-remove:focus-visible { opacity: 1; }
 }

@@ -34,6 +34,7 @@ import {
 import { makeId, formatTime } from './schedule.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import { initExportPlan } from './export-plan.js';
+import { buildMenu, setupMenu } from './menu.js';
 import { renderNextMeals } from './next-meals.js';
 import { loadJson, saveJson } from './storage.js';
 
@@ -125,42 +126,38 @@ function dayColumn(name, day, isToday) {
     'aria-label': name + "'s meals",
     onclick: () => toggleDay(day, column, toggle),
   }, el('h3', { text: name }), el('span', { class: 'chevron', 'aria-hidden': 'true' }));
-  const head = el('div', { class: 'meal-day-head' }, toggle, el('span', { class: 'meal-day-summary', text: summary }));
-  const links = el('div', { class: 'meal-day-links' });
-  if (totals.count > 0) {
-    links.append(el('button', {
-      class: 'link-btn small',
-      type: 'button',
-      text: 'Copy to other days',
-      onclick: () => openCopy({ day }),
-    }));
-  }
-
+  // Adding a meal is always one tap away. Copying the day and putting its meals back in the usual
+  // order live in a small menu, which only shows when the day has something to copy or reset.
+  const addMeal = el('button', {
+    class: 'icon-btn small day-add',
+    type: 'button',
+    text: '+',
+    title: 'Add a meal on ' + name,
+    'aria-label': 'Add a meal on ' + name,
+    onclick: () => openMealForm(null, day),
+  });
+  const menuItems = [];
+  if (totals.count > 0) menuItems.push({ text: 'Copy to other days', onclick: () => openCopy({ day }) });
   if (hasCustomOrder(meals, day)) {
-    links.append(el('button', {
-      class: 'link-btn small',
-      type: 'button',
+    menuItems.push({
       text: 'Reset order',
-      'aria-label': 'Put ' + name + "'s meals back in the usual order",
+      label: 'Put ' + name + "'s meals back in the usual order",
       onclick: () => {
         meals = clearOrder(meals, day);
         persist();
         renderNutrition();
         showMealStatus(name + "'s meals are back in the usual order.");
       },
-    }));
+    });
   }
-
-  const addMeal = el('button', {
-    class: 'btn ghost small add-meal',
-    type: 'button',
-    text: '+ Add meal',
-    'aria-label': 'Add a meal on ' + name,
-    onclick: () => openMealForm(null, day),
-  });
+  const actions = el('div', { class: 'meal-day-actions' }, addMeal);
+  if (menuItems.length > 0) actions.append(buildMenu('icon-btn small', 'More for ' + name, ['⋯'], menuItems));
+  const head = el('div', { class: 'meal-day-head' },
+    el('div', { class: 'meal-day-top' }, toggle, actions),
+    el('span', { class: 'meal-day-summary', text: summary }));
   const column = el('section', { class: 'meal-day' + (isToday ? ' today' : '') + (collapsed ? ' collapsed' : ''), 'aria-label': name, 'data-day': String(day) },
     head,
-    foldBody(links, ...(totals.count > 0 ? macroRows(day) : []), ...dayMeals.map(mealCard), addMeal));
+    foldBody(...(totals.count > 0 ? macroRows(day) : []), ...dayMeals.map(mealCard)));
   return column;
 }
 
@@ -296,7 +293,7 @@ function showDropLine(column, index, ignoreId) {
   document.querySelectorAll('.drop-line').forEach((line) => line.remove());
   if (!column) return;
   const cards = [...column.querySelectorAll('.meal-card')].filter((card) => card.dataset.id !== ignoreId);
-  column.insertBefore(el('div', { class: 'drop-line' }), cards[index] || column.querySelector('.add-meal'));
+  column.insertBefore(el('div', { class: 'drop-line' }), cards[index] || null);
 }
 
 // Makes a meal card (or history entry) draggable by its text. A copy of the card follows the
@@ -658,6 +655,7 @@ $('#savePlanForm').addEventListener('submit', (event) => {
 });
 
 initExportPlan(() => meals, showMealStatus);
+setupMenu($('#planMenu'));
 
 $('#loadPlanBtn').addEventListener('click', () => {
   confirming = null;
