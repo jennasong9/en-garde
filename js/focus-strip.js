@@ -15,5 +15,5 @@ export function renderFocusStrip(strip, entries, { openJournal = null } = {}) {
     el('span', { class: 'focus-label', text: 'Next session focus' }),
     el('p', { class: 'focus-text', text: latest.focus }),
     el('span', { class: 'focus-from', text: 'from ' + from }));
-  if (openJournal) strip.append(el('button', { class: 'link-btn small', type: 'button', text: 'Open Journal', onclick: openJournal }));
+  if (openJournal) strip.append(el('button', { class: 'link-btn small', type: 'button', text: 'Open Journal', onclick: () => openJournal(latest.date) }));
 }

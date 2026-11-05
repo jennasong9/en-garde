@@ -21,8 +21,6 @@ const sort = {
 };
 const storedOrder = loadJson('journalOrder', []);
 let customOrder = Array.isArray(storedOrder) ? storedOrder : [];
-// When on, every entry has an "Open entry" button that opens it in a pop-up instead of expanding it in the list.
-let popupMode = loadJson('journalPopup', false) === true;
 let anchorIso = toIso(new Date());
 const activeFeelings = new Set();
 
@@ -60,13 +58,11 @@ export function renderJournal() {
   $('#journalCalendar').hidden = view !== 'calendar';
   $('#journalList').hidden = view !== 'list';
   $('#journalNav').hidden = view !== 'calendar';
-  $('#journalListOptions').hidden = view !== 'list';
   $('#journalSort').hidden = view !== 'list';
   $('#sortBy').value = sort.by;
   $('#sortOrder').value = sort.order;
   $('#sortOrderField').hidden = sort.by === 'custom';
   $('#sortHint').hidden = sort.by !== 'custom';
-  $('#popupToggle').checked = popupMode;
   // There is one entry per day, so the button says whether it starts today's entry or reopens it.
   $('#journalAdd').textContent = entries[toIso(new Date())] ? "Edit today's entry" : "+ Write today's entry";
   renderFocusStrip($('#journalFocus'), entries);
@@ -157,7 +153,8 @@ function renderCalendar() {
       cell.append(el('span', { class: 'chip feeling-' + entry.feeling },
         el('span', { class: 'chip-text', text: icon + ' ' + feelingLabel })));
     }
-    cell.addEventListener('click', () => openEntry(iso, cell));
+    // A day with an entry opens it for reading (Edit is in that pop-up); an empty day starts a new one.
+    cell.addEventListener('click', () => (entry ? openEntryView(iso, cell) : openEntry(iso, cell)));
     cells.push(cell);
   }
   $('#journalGrid').replaceChildren(...cells);
@@ -184,29 +181,12 @@ function renderList() {
     return;
   }
   for (const entry of list) container.append(entryCard(entry));
-  updateTruncation();
 }
 
-// Entries longer than this many lines are cut off in the list, with a "Show more" button.
-// (The same number is in the .clamped style in style.css.)
-const expandedDates = new Set();
-
+// Each entry in the list is a short preview (cut off after a few lines, see .clamped in style.css)
+// with an "Open entry" button that reads the whole entry in a pop-up.
 function entryCard(entry) {
   const { icon, label } = FEELINGS[entry.feeling];
-  const toggle = el('button', {
-    class: 'link-btn small entry-toggle',
-    type: 'button',
-    hidden: '',
-    onclick: () => {
-      if (popupMode) {
-        openEntryView(entry.date);
-        return;
-      }
-      if (expandedDates.has(entry.date)) expandedDates.delete(entry.date);
-      else expandedDates.add(entry.date);
-      updateTruncation();
-    },
-  });
   const head = el('div', { class: 'journal-entry-head' },
     el('span', { class: 'journal-entry-date', text: longDate(entry.date, true) }),
     el('span', { class: 'journal-entry-feeling', text: icon + ' ' + label }));
@@ -223,7 +203,13 @@ function entryCard(entry) {
   card.append(
     text,
     el('div', { class: 'journal-entry-actions' },
-      toggle,
+      el('button', {
+        class: 'btn small',
+        type: 'button',
+        text: 'Open entry',
+        'aria-haspopup': 'dialog',
+        onclick: () => openEntryView(entry.date),
+      }),
       el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', onclick: () => openEntry(entry.date) })));
   if (sort.by === 'custom') head.prepend(reorderHandle(card, entry.date));
   return card;
@@ -320,37 +306,11 @@ $('#sortOrder').addEventListener('change', (event) => {
   renderJournal();
 });
 
-// Sets each entry's button. With pop-ups on, every entry gets "Open entry". With them off, only
-// entries that are cut off get "Show more" (or "Show less" once opened in the list). It measures
-// the text, so it runs after the list is on screen and again when the window resizes.
-function updateTruncation() {
-  for (const card of $('#journalList').querySelectorAll('.journal-entry')) {
-    const text = card.querySelector('.journal-entry-text');
-    const toggle = card.querySelector('.entry-toggle');
-    const expanded = !popupMode && expandedDates.has(card.dataset.date);
-    text.classList.toggle('clamped', !expanded);
-    const cutOff = text.scrollHeight > text.clientHeight + 1;
-    toggle.hidden = !popupMode && !expanded && !cutOff;
-    if (popupMode) {
-      toggle.textContent = 'Open entry';
-      toggle.removeAttribute('aria-expanded');
-      toggle.setAttribute('aria-haspopup', 'dialog');
-    } else {
-      toggle.textContent = expanded ? 'Show less' : 'Show more';
-      toggle.setAttribute('aria-expanded', String(expanded));
-      toggle.removeAttribute('aria-haspopup');
-    }
-  }
-}
-window.addEventListener('resize', () => {
-  if (view === 'list' && !$('#journalPage').hidden) updateTruncation();
-});
-
 // ---------- read an entry in a pop-up ----------
 const entryViewDialog = $('#entryViewDialog');
 let viewedDate = null;
 
-function openEntryView(iso) {
+function openEntryView(iso, origin = null) {
   const entry = entries[iso];
   viewedDate = iso;
   const { icon, label } = FEELINGS[entry.feeling];
@@ -360,18 +320,26 @@ function openEntryView(iso) {
   $('#entryViewSession').hidden = !entry.sessionLabel;
   $('#entryViewSession').textContent = entry.sessionLabel || '';
   fillEntryText($('#entryViewText'), entry);
-  showDialog(entryViewDialog);
+  const times = writtenText(entry);
+  $('#entryViewTimes').hidden = !times;
+  $('#entryViewTimes').textContent = times;
+  videoViewer.show(entry);
+  showDialog(entryViewDialog, origin);
 }
 
-$('#popupToggle').addEventListener('change', (event) => {
-  popupMode = event.target.checked;
-  saveJson('journalPopup', popupMode);
-  updateTruncation();
-});
+// Opens one entry for reading (used by the focus strip's "Open Journal" button). Returns false when
+// there is no entry for that day.
+export function viewEntry(iso) {
+  if (!entries[iso]) return false;
+  openEntryView(iso);
+  return true;
+}
+
 $('#entryViewEdit').addEventListener('click', () => {
   entryViewDialog.close();
   openEntry(viewedDate);
 });
+entryViewDialog.addEventListener('close', () => videoViewer.stop());
 $('#entryViewDone').addEventListener('click', () => entryViewDialog.close());
 $('#entryViewClose').addEventListener('click', () => entryViewDialog.close());
 closeOnBackdropClick(entryViewDialog);
@@ -406,6 +374,8 @@ function fillSessionChoices(iso, entry) {
   $('#jSession').value = entry ? entry.sessionId || '' : sessions.length === 1 ? sessions[0].id : '';
   $('#jSession').disabled = choices.length === 1 && sessions.length === 0;
 }
+
+const videoViewer = createVideoReview($('#entryViewVideo'), () => {}, { readOnly: true });
 
 const videoReview = createVideoReview($('#videoReview'), () => {
   $('#jVideoState').value = videoReview.stateText();

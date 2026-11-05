@@ -44,7 +44,9 @@ export function showToast(content, { actionLabel = '', onAction = null, onClose 
     toast.append(button);
   }
   toast.addEventListener('click', hideToast);
-  document.body.append(toast);
+  // A pop-up that is open blocks everything outside it, so the toast goes inside it (when there is
+  // one) to stay on top and clickable.
+  (document.querySelector('dialog[open]') || document.body).append(toast);
   onHide = onClose;
   const shown = toast;
   requestAnimationFrame(() => requestAnimationFrame(() => shown.classList.add('show')));

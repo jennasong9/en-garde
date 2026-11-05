@@ -627,10 +627,8 @@ textarea { min-height: 76px; resize: vertical; }
 .journal-entry-times { margin: 0 0 6px; font-size: 12px; color: var(--text-faint); }
 .entry-handle { width: 34px; height: 34px; border: 0; border-radius: 8px; background: var(--surface-2); color: var(--text-dim); font-size: 18px; line-height: 1; cursor: grab; touch-action: none; }
 .entry-handle:hover { background: var(--sage-soft); color: var(--sage-deep); }
-.journal-options { margin: 8px 0 0; }
 .entry-view-text { margin: 8px 0 14px; max-height: 55vh; overflow-y: auto; }
 .journal-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.entry-toggle { min-height: 36px; font-size: 14px; }
 
 /* ===== Saved meal plans ===== */
 .plan-head { flex-wrap: wrap; }
@@ -974,3 +972,6 @@ form h3 { font-size: 17px; }
 .journal-entry-video { margin: 4px 0 0; font-size: 13px; color: var(--text-dim); }
 .video-slot iframe { display: block; width: 100%; height: 100%; border: 0; }
 .routine-section-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.video-view { margin: 12px 0 4px; }
+.video-view-title { margin: 0 0 8px; font-size: 15px; }
+.video-view-body { display: flex; flex-direction: column; gap: 10px; }

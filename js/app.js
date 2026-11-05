@@ -15,7 +15,7 @@ import { renderHydration } from './hydration.js';
 import { renderTodayTray } from './today-tray.js';
 import { renderRoutines, setSessionStepsDone, showRoutinesDay } from './routines-page.js';
 import { SECTION_TYPES } from './sessionsteps.js';
-import { renderJournal } from './journal-page.js';
+import { renderJournal, viewEntry } from './journal-page.js';
 import { renderNutrition } from './nutrition.js';
 import { loadJson, saveJson } from './storage.js';
 import { initProfileMenu, rememberProfile } from './profile-menu.js';
@@ -1161,9 +1161,16 @@ const PAGES = ['schedule', 'routines', 'nutrition', 'journal', 'goals'];
 
 // The "Open Journal" button on the Routines page's focus strip: goes to the Journal and says so,
 // with a way back, since the page changes under the user.
-function openJournal() {
+function openJournal(date) {
   location.hash = '#journal';
-  showToast('Opened your Journal.', { actionLabel: 'Go back', onAction: () => { location.hash = '#routines'; } });
+  const opened = viewEntry(date);
+  showToast(opened ? 'Opened your Journal entry.' : 'Opened your Journal.', {
+    actionLabel: 'Go back',
+    onAction: () => {
+      document.querySelector('#entryViewDialog')?.close();
+      location.hash = '#routines';
+    },
+  });
 }
 
 // The "Open routine" button on a session: shows that session's day on the Routines page, with a way

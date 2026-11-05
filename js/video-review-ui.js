@@ -39,7 +39,7 @@ function loadYouTubeApi() {
 //   savedFileId()   the id of the file video the entry had when it was opened, if any
 //   stop()          stop the video and free what it uses (call when the pop-up closes)
 //   stateText()     a text that changes whenever the section does
-export function createVideoReview(container, onChange) {
+export function createVideoReview(container, onChange, { readOnly = false } = {}) {
   let choice = null; // null, a saved video, or { kind: 'pending', file }
   let notes = [];
   let openedFileId = null;
@@ -47,12 +47,20 @@ export function createVideoReview(container, onChange) {
   let objectUrl = null;
   let generation = 0; // bumps whenever the player is rebuilt, so a slow load cannot land late
 
-  const title = el('button', { class: 'meal-day-toggle fold-title', type: 'button', 'aria-expanded': 'false' },
+  // In read-only mode (viewing an entry) there is no choosing, removing or adding: just the video
+  // and the notes, always showing.
+  const title = readOnly ? el('h3', { class: 'video-view-title', text: 'Video review' }) : el('button', { class: 'meal-day-toggle fold-title', type: 'button', 'aria-expanded': 'false' },
     el('span', { class: 'video-review-title', text: 'Video review (optional)' }), el('span', { class: 'chevron', 'aria-hidden': 'true' }));
   const body = el('div', { class: 'fold-inner' });
-  container.classList.add('video-review', 'collapsed');
-  container.replaceChildren(title, el('div', { class: 'fold' }, body));
-  title.addEventListener('click', () => setFolded(container, title, !container.classList.contains('collapsed')));
+  if (readOnly) {
+    body.className = 'video-view-body';
+    container.classList.add('video-view');
+    container.replaceChildren(title, body);
+  } else {
+    container.classList.add('video-review', 'collapsed');
+    container.replaceChildren(title, el('div', { class: 'fold' }, body));
+    title.addEventListener('click', () => setFolded(container, title, !container.classList.contains('collapsed')));
+  }
 
   // The video itself changed (chosen or removed): rebuild everything.
   const changed = () => {
@@ -152,7 +160,7 @@ export function createVideoReview(container, onChange) {
 
   // ---- the notes ----
   function noteList() {
-    if (notes.length === 0) return el('p', { class: 'empty', text: 'No notes yet. Pause the video where something happens and add one.' });
+    if (notes.length === 0) return el('p', { class: 'empty', text: readOnly ? 'No notes on this video.' : 'No notes yet. Pause the video where something happens and add one.' });
     return el('ul', { class: 'video-notes' }, ...notes.map((note, index) => el('li', {},
       el('button', {
         class: 'video-note-time', type: 'button', text: formatTimestamp(note.time),
@@ -160,10 +168,10 @@ export function createVideoReview(container, onChange) {
         onclick: () => player?.seek(note.time),
       }),
       el('span', { class: 'video-note-text', text: note.text }),
-      el('button', {
+      ...(readOnly ? [] : [el('button', {
         class: 'icon-btn small', type: 'button', text: '✕', 'aria-label': 'Remove note at ' + formatTimestamp(note.time),
         onclick: () => { notes = removeVideoNote(notes, index); notesChanged(); },
-      }))));
+      })]))));
   }
 
   function noteForm() {
@@ -218,6 +226,12 @@ export function createVideoReview(container, onChange) {
       return;
     }
     const slot = el('div', { class: 'video-slot' });
+    if (readOnly) {
+      body.replaceChildren(slot, notesArea);
+      renderNotes();
+      buildPlayer(slot, generation);
+      return;
+    }
     body.replaceChildren(
       slot,
       el('div', { class: 'video-review-bar' },
@@ -237,7 +251,8 @@ export function createVideoReview(container, onChange) {
       notes = video ? cleanVideoNotes(entry.videoNotes) : [];
       openedFileId = video?.kind === 'file' ? video.id : null;
       render();
-      setFolded(container, title, !video);
+      if (readOnly) container.hidden = !video;
+      else setFolded(container, title, !video);
     },
     async collect() {
       if (!choice) return { video: null, videoNotes: [] };
