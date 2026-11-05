@@ -1,18 +1,35 @@
+import { ACCENT_CHOICES, normalizeAccent } from './accent.js';
 import { FONT_CHOICES, normalizeFont } from './fonts.js';
+import { addVideoNote, cleanVideoNotes, formatTimestamp, parseTimestamp, removeVideoNote, validateVideoNote } from './video-review.js';
+import {
+  MAX_SAVED_ROUTINES,
+  cleanSavedRoutines,
+  defaultRoutineName,
+  routineHasStep,
+  routineWithoutStep,
+  starterRoutines,
+  routineSummary,
+  snapshotRoutine,
+  validateRoutineName,
+} from './routinelibrary.js';
 import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import {
   MAX_STEPS,
   SECTION_TYPES,
   cleanStepsByType,
+  cleanStepsBySession,
+  keepStepsFor,
+  migrateStepsToSessions,
+  doneAfterTick,
   finishedSession,
   keepTicksFor,
   removeStep,
   saveStep,
   sessionProgress,
-  startingSteps,
   stepKey,
   stepsDone,
+  ticksForDone,
   toggleStep,
   validateStep,
 } from './sessionsteps.js';
@@ -71,6 +88,11 @@ import {
   visibleDays,
   weekStats,
 } from './schedule.js';
+
+import { RATING_LADDER, currentRating, earnGoalName, isRatingGoalName, parseRating, ratingGoalConflict, ratingLabel, ratingTargets } from './rating.js';
+import { mealWhen, todayItems, todayLine, weekLine } from './today.js';
+import { checkVideoFile, MAX_VIDEO_BYTES, normalizeVideo, parseYouTubeLink, videoLabel } from './stepvideo.js';
+import { cleanProfileList, newProfileId, profileSummary, startingData, validateNewProfile } from './profiles.js';
 
 const results = [];
 
@@ -701,15 +723,13 @@ test('isUrgent is true for overdue, due today, and 7 or fewer days left, but not
   equal(isUrgent({ kind: 'done', days: 0 }), false);
 });
 
-test('visibleGoals applies the tag filter and, when asked, hides completed goals', () => {
+test('visibleGoals keeps only the chosen tags, in order, finished goals last', () => {
   const all = [goal('a', { tag: 'fitness', progress: 100 }), goal('b', { tag: 'fitness', progress: 40 }),
     goal('c', { tag: 'tactics', progress: 100 })];
-  equal(visibleGoals(all, new Set(), false).map((g) => g.id), ['b', 'a', 'c']);
-  equal(visibleGoals(all, new Set(), true).map((g) => g.id), ['b']);
-  equal(visibleGoals(all, new Set(['tactics']), false).map((g) => g.id), ['c']);
-  equal(visibleGoals(all, new Set(['tactics']), true), []);
+  equal(visibleGoals(all, new Set()).map((g) => g.id), ['b', 'a', 'c']);
+  equal(visibleGoals(all, new Set(['tactics'])).map((g) => g.id), ['c']);
+  equal(visibleGoals(all, new Set(['technique'])), []);
 });
-
 test('only finished, unarchived goals can be archived', () => {
   equal(canArchive(goal('a', { progress: 100 })), true);
   equal(canArchive(goal('a', { progress: 80 })), false);
@@ -791,6 +811,93 @@ test('normalizeFont keeps the three choices and falls back to sans-serif', () =>
   equal(normalizeFont('mono'), 'mono');
   equal(normalizeFont('comic'), 'sans');
   equal(normalizeFont(null), 'sans');
+});
+
+test('normalizeAccent keeps the five colors and falls back to sage', () => {
+  equal(ACCENT_CHOICES, ['sage', 'ocean', 'lavender', 'rose', 'sand']);
+  equal(normalizeAccent('rose'), 'rose');
+  equal(normalizeAccent('neon'), 'sage');
+  equal(normalizeAccent(null), 'sage');
+});
+
+test('timestamps read as minutes:seconds and come back out the same way', () => {
+  equal(parseTimestamp('1:32'), 92);
+  equal(parseTimestamp(' 90 '), 90);
+  equal(parseTimestamp('1:02:05'), 3725);
+  equal(parseTimestamp('1:75'), null);
+  equal(parseTimestamp('abc'), null);
+  equal(parseTimestamp(''), null);
+  equal(formatTimestamp(92), '1:32');
+  equal(formatTimestamp(5), '0:05');
+  equal(formatTimestamp(3725), '1:02:05');
+  equal(formatTimestamp(-4), '0:00');
+});
+
+test('a video note needs a time like 1:32 and some text within the limit', () => {
+  equal(validateVideoNote({ time: '1:32', text: '  rushed my lunge ' }), { value: { time: 92, text: 'rushed my lunge' } });
+  equal(typeof validateVideoNote({ time: 'soon', text: 'x' }).error, 'string');
+  equal(typeof validateVideoNote({ time: '0:10', text: '   ' }).error, 'string');
+  equal(typeof validateVideoNote({ time: '0:10', text: 'x'.repeat(201) }).error, 'string');
+});
+
+test('video notes stay in video order, can be removed, and are capped at 40', () => {
+  let notes = addVideoNote([], { time: '2:00', text: 'second' }).notes;
+  notes = addVideoNote(notes, { time: '0:30', text: 'first' }).notes;
+  equal(notes.map((note) => note.text), ['first', 'second']);
+  equal(removeVideoNote(notes, 0).map((note) => note.text), ['second']);
+  const full = Array.from({ length: 40 }, (unused, index) => ({ time: index, text: 'n' }));
+  equal(typeof addVideoNote(full, { time: '5:00', text: 'one more' }).error, 'string');
+});
+
+test('cleanVideoNotes drops damaged notes and sorts the rest', () => {
+  equal(cleanVideoNotes('nope'), []);
+  equal(cleanVideoNotes([{ time: 50, text: 'b' }, { time: 'x', text: 'bad' }, { time: 10, text: 'a' }, { time: 5, text: '  ' }]),
+    [{ time: 10, text: 'a' }, { time: 50, text: 'b' }]);
+});
+
+// ---------- saved routines (a session type's steps, saved under a name) ----------
+const routineSteps = [{ name: 'Lunge chain', desc: '6 reps' }, { name: 'Advance-retreat', desc: '' }];
+const youtube = { kind: 'youtube', id: 'dQw4w9WgXcQ' };
+const upload = { kind: 'file', id: 'abc-1', name: 'clip.mp4' };
+
+test('a saved routine keeps the steps in order and any YouTube video, but not uploaded video files', () => {
+  const saved = snapshotRoutine([{ ...routineSteps[0], video: youtube }, { ...routineSteps[1], video: upload }], '  Tuesday footwork ', '2026-11-05T10:00:00Z', () => 'r1');
+  equal(saved.id, 'r1');
+  equal(saved.name, 'Tuesday footwork');
+  equal(saved.steps, [{ name: 'Lunge chain', desc: '6 reps', video: youtube }, { name: 'Advance-retreat', desc: '' }]);
+  equal(saved.droppedVideos, 1);
+});
+
+test('routine names are needed, short, and unique within a session type', () => {
+  const existing = [{ name: 'Warm-up focus' }];
+  equal(validateRoutineName('Heavy day', existing), null);
+  equal(typeof validateRoutineName('   ', existing), 'string');
+  equal(typeof validateRoutineName('x'.repeat(61), existing), 'string');
+  equal(typeof validateRoutineName('warm-up FOCUS', existing), 'string');
+  const many = Array.from({ length: MAX_SAVED_ROUTINES }, (unused, index) => ({ name: 'R' + index }));
+  equal(typeof validateRoutineName('One more', many), 'string');
+});
+
+test('the suggested routine name uses the session name and avoids names already taken', () => {
+  equal(defaultRoutineName('Footwork', []), 'Footwork routine');
+  equal(defaultRoutineName('Footwork', [{ name: 'Footwork routine' }, { name: 'Footwork routine (2)' }]), 'Footwork routine (3)');
+});
+
+test('routineSummary counts the steps', () => {
+  equal(routineSummary({ steps: routineSteps }), '2 steps');
+  equal(routineSummary({ steps: [routineSteps[0]] }), '1 step');
+});
+
+test('cleanSavedRoutines keeps a list for every section type and drops damaged routines', () => {
+  const clean = cleanSavedRoutines({
+    footwork: [{ id: 'a', name: 'Good', savedAt: 'x', steps: routineSteps }, { id: 'b', name: '', steps: routineSteps }, { name: 'No id', steps: routineSteps }, 'junk'],
+    rest: [{ id: 'c', name: 'Rest steps', steps: routineSteps }],
+    blade: 'oops',
+  });
+  equal(clean.footwork.map((routine) => routine.name), ['Good']);
+  equal(clean.blade, []);
+  equal(clean.rest, undefined);
+  equal(cleanSavedRoutines(null).bout, []);
 });
 
 test('parseOptionalFencerLink lets the box be empty (no link) but still checks anything typed', () => {
@@ -1006,27 +1113,8 @@ test('upcomingMeals puts a meal with no time at the end of its day, and handles 
 const row = (name, desc = '') => ({ name, desc });
 const stepList = (...names) => names.map((name) => row(name));
 
-test('the Routines sections are the session types, in the order of the calendar filters', () => {
-  equal(SECTION_TYPES, ['footwork', 'blade', 'bout', 'strength', 'rest', 'tournament', 'other']);
-});
-
-test('a new visitor starts with Footwork and Bladework steps and nothing in the other sections', () => {
-  const start = startingSteps([]);
-  equal(start.footwork.length, 4);
-  equal(start.blade.length, 4);
-  equal(start.footwork[0], row('Advance-retreat', '4 lengths, small controlled steps.'));
-  for (const type of ['bout', 'strength', 'rest', 'tournament', 'other']) equal(start[type], []);
-});
-
-test('a routine saved earlier keeps its steps when its name is a session type', () => {
-  const start = startingSteps([
-    { name: 'bouting', steps: [row('Warm bouts', 'first to 5'), 'Pool bout — to 5'] },
-    { name: 'Warmup', steps: [row('Jog')] },
-    { name: 'Footwork', steps: [] },
-  ]);
-  equal(start.bout, [row('Warm bouts', 'first to 5'), row('Pool bout', 'to 5')]);
-  equal(start.footwork.length, 4);
-  equal(startingSteps('nonsense').blade.length, 4);
+test('the Routines sections are the session types, in the order of the calendar filters, without Rest and Tournament (neither has steps)', () => {
+  equal(SECTION_TYPES, ['footwork', 'blade', 'bout', 'strength', 'other']);
 });
 
 test('cleanStepsByType gives every type a list and drops steps that cannot be used', () => {
@@ -1035,7 +1123,55 @@ test('cleanStepsByType gives every type a list and drops steps that cannot be us
   equal(clean.strength, []);
   equal(Object.keys(clean), SECTION_TYPES);
   equal(cleanStepsByType(null).footwork, []);
-  equal(cleanStepsByType({ rest: Array.from({ length: 40 }, (_, i) => row('Step ' + i)) }).rest.length, MAX_STEPS);
+  equal(cleanStepsByType({ other: Array.from({ length: 40 }, (_, i) => row('Step ' + i)) }).other.length, MAX_STEPS);
+  equal(cleanStepsByType({ rest: [row('Stretch')], tournament: [row('Warm up')] }).rest, undefined);
+  equal(cleanStepsByType({ tournament: [row('Warm up')] }).tournament, undefined);
+});
+
+test('every session has its own steps: the old shared steps go to sessions up to today, later ones start empty', () => {
+  const sessions = [
+    { id: 'a', type: 'footwork', date: '2026-11-03' },
+    { id: 'b', type: 'footwork', date: '2026-11-05' },
+    { id: 'c', type: 'footwork', date: '2026-11-09' },
+    { id: 'd', type: 'rest', date: '2026-11-03' },
+    { id: 'e', type: 'bout', date: '2026-11-03' },
+  ];
+  const moved = migrateStepsToSessions({ footwork: [row('Lunge')], rest: [row('Stretch')] }, sessions, '2026-11-05');
+  equal(Object.keys(moved), ['a', 'b']);
+  equal(moved.a.steps, [row('Lunge')]);
+});
+
+test('cleanStepsBySession keeps usable steps and the saved routine link, and drops empty or damaged records', () => {
+  const clean = cleanStepsBySession({
+    a: { steps: [row('Lunge'), row('  ')], routineId: 'r1' },
+    b: { steps: [] },
+    c: 'junk',
+    d: { steps: [row('Parry')] },
+  });
+  equal(clean, { a: { steps: [row('Lunge')], routineId: 'r1' }, d: { steps: [row('Parry')] } });
+  equal(cleanStepsBySession(null), {});
+});
+
+test('keepStepsFor keeps the steps of sessions still on the Schedule and reports the rest', () => {
+  const result = keepStepsFor({ a: { steps: [row('A')] }, b: { steps: [row('B')] } }, [{ id: 'a' }]);
+  equal(Object.keys(result.kept), ['a']);
+  equal(result.removed, [{ steps: [row('B')] }]);
+});
+
+test('a saved routine can say whether it has a step, and be copied without one', () => {
+  const routine = { id: 'r', name: 'R', steps: [row('Lunge', '6 reps'), row('Parry')] };
+  equal(routineHasStep(routine, row('Lunge', '6 reps')), true);
+  equal(routineHasStep(routine, row('Lunge', 'other')), false);
+  equal(routineWithoutStep(routine, row('Lunge', '6 reps')).steps, [row('Parry')]);
+  equal(routine.steps.length, 2);
+});
+
+test('a new visitor can load starter routines for Footwork and Bladework, and nothing else', () => {
+  const starters = starterRoutines(() => 'id', '2026-11-05T00:00:00Z');
+  equal(starters.footwork[0].name, 'Starter footwork');
+  equal(starters.footwork[0].steps.length, 4);
+  equal(starters.blade[0].name, 'Starter bladework');
+  equal(starters.bout, []);
 });
 
 test('validateStep trims, needs a name, and limits the lengths', () => {
@@ -1135,6 +1271,220 @@ test('mealsFromPlan gives every meal a new id and leaves them unprepped', () => 
 test('planSummary counts meals and days', () => {
   equal(planSummary(planOf('P', [meal('a', 1, 'A'), meal('b', 1, 'B'), meal('c', 3, 'C')])), '3 meals on 2 days');
   equal(planSummary(planOf('P', [meal('a', 1, 'A')])), '1 meal on 1 day');
+});
+
+// ---------- profiles ----------
+const welcomeForm = (extra = {}) => ({ name: ' Ana ', weapon: 'Epee', ...extra });
+
+test('a new profile needs only a name and a weapon', () => {
+  const result = validateNewProfile(welcomeForm());
+  equal(result.profile.name, 'Ana');
+  equal(result.profile.weapon, 'Epee');
+  equal([result.profile.club, result.profile.rating, result.profile.trackerLink], ['', '', '']);
+  equal([result.profile.theme, result.profile.font], ['auto', 'sans']);
+});
+
+test('a new profile without a name or a weapon is refused', () => {
+  equal(validateNewProfile(welcomeForm({ name: '   ' })).error, 'Please enter your name.');
+  equal(validateNewProfile(welcomeForm({ weapon: '' })).error, 'Please choose your weapon.');
+});
+
+test('a new profile refuses a link that is not a FencingTracker profile', () => {
+  equal(typeof validateNewProfile(welcomeForm({ trackerLink: 'https://example.com/p/1/x' })).error, 'string');
+  equal(validateNewProfile(welcomeForm({ trackerLink: 'fencingtracker.com/p/12/Ana?x=1' })).profile.trackerLink, 'https://fencingtracker.com/p/12/Ana');
+});
+
+test('starting data leaves the theme unsaved for "match my device" and turns on chosen reminders', () => {
+  const plain = startingData(validateNewProfile(welcomeForm()).profile);
+  equal('theme' in plain, false);
+  equal(plain.reminders.meals, false);
+  const chosen = startingData(validateNewProfile(welcomeForm({ theme: 'dark', font: 'mono', mealReminders: true })).profile);
+  equal([chosen.theme, chosen.font, chosen.reminders.meals, chosen.reminders.water], ['dark', 'mono', true, false]);
+  equal(chosen.profile, { name: 'Ana', club: '', rating: '', weapon: 'Epee' });
+});
+
+test('profile ids differ and the saved list drops damaged entries', () => {
+  equal(newProfileId(1000, 0.1) === newProfileId(1000, 0.2), false);
+  equal(cleanProfileList([{ id: 'a1', name: 'Ana' }, { id: '../x', name: 'Bad' }, null, { name: 'No id' }]), [{ id: 'a1', name: 'Ana' }]);
+  equal(cleanProfileList('nonsense'), []);
+});
+
+test('a profile summary joins the weapon and the club, leaving out blanks', () => {
+  equal(profileSummary({ weapon: 'Foil', club: 'Point Fencing Club' }), 'Foil · Point Fencing Club');
+  equal(profileSummary({ weapon: 'Sabre', club: '' }), 'Sabre');
+});
+
+// ---------- step videos ----------
+test('parseYouTubeLink accepts watch, short, shorts and embed links and returns the video id', () => {
+  const id = 'dQw4w9WgXcQ';
+  for (const link of [
+    'https://www.youtube.com/watch?v=' + id,
+    'youtube.com/watch?v=' + id + '&t=30s',
+    'https://youtu.be/' + id + '?si=abc',
+    'https://m.youtube.com/shorts/' + id,
+    'https://www.youtube.com/embed/' + id,
+  ]) equal(parseYouTubeLink(link), { id });
+});
+
+test('parseYouTubeLink rejects other sites, look-alikes, channel pages and empty text', () => {
+  for (const link of ['', 'https://vimeo.com/123456789', 'https://youtube.com.evil.com/watch?v=dQw4w9WgXcQ', 'https://www.youtube.com/@fencing', 'https://www.youtube.com/watch?v=short', 'javascript:alert(1)']) {
+    equal(typeof parseYouTubeLink(link).error, 'string');
+  }
+});
+
+test('checkVideoFile needs a video type and no more than the size limit', () => {
+  equal(checkVideoFile({ type: 'video/mp4', size: 1000 }), {});
+  equal(checkVideoFile({ type: 'video/quicktime', size: MAX_VIDEO_BYTES }), {});
+  equal(typeof checkVideoFile({ type: 'image/png', size: 10 }).error, 'string');
+  equal(typeof checkVideoFile({ type: 'video/mp4', size: MAX_VIDEO_BYTES + 1 }).error, 'string');
+});
+
+test('normalizeVideo keeps a good youtube or file video and drops anything else', () => {
+  equal(normalizeVideo({ kind: 'youtube', id: 'dQw4w9WgXcQ', extra: 1 }), { kind: 'youtube', id: 'dQw4w9WgXcQ' });
+  equal(normalizeVideo({ kind: 'file', id: 'ab12-cd', name: 'lunge.mp4' }), { kind: 'file', id: 'ab12-cd', name: 'lunge.mp4' });
+  equal([normalizeVideo(null), normalizeVideo({ kind: 'youtube', id: '<script>' }), normalizeVideo({ kind: 'file', id: '../x', name: 'a' }), normalizeVideo('x')], [null, null, null, null]);
+  equal(videoLabel({ kind: 'file', id: 'a', name: 'lunge.mp4' }), 'lunge.mp4');
+});
+
+test('a step keeps its video through validate, save and clean, and a step without one has no video key', () => {
+  const video = { kind: 'youtube', id: 'dQw4w9WgXcQ' };
+  equal(validateStep({ name: ' Lunge ', desc: '', video }).value, { name: 'Lunge', desc: '', video });
+  equal(validateStep({ name: 'Lunge', desc: '' }).value, { name: 'Lunge', desc: '' });
+  equal(typeof validateStep({ name: 'Lunge', desc: '', video: { kind: 'youtube', id: 'bad' } }).error, 'string');
+  equal(cleanStepsByType({ footwork: [{ name: 'Lunge', desc: '', video }, { name: 'Plain', desc: '', video: { kind: 'x' } }] }).footwork, [{ name: 'Lunge', desc: '', video }, { name: 'Plain', desc: '' }]);
+});
+
+test('doneAfterTick marks Done when the last step is ticked and clears it when a complete session is unticked', () => {
+  const progress = (done, total) => ({ done, total });
+  equal(doneAfterTick(progress(2, 3), progress(3, 3)), true);
+  equal(doneAfterTick(progress(3, 3), progress(2, 3)), false);
+  equal(doneAfterTick(progress(0, 3), progress(1, 3)), null);
+  equal(doneAfterTick(progress(2, 3), progress(1, 3)), null);
+  equal(doneAfterTick(progress(0, 0), progress(0, 0)), null);
+});
+
+test('ticksForDone ticks every step when a session becomes done and none when it is cleared', () => {
+  const steps = [row('Lunge', '10 reps'), row('Parry', '')];
+  equal(ticksForDone(steps, true), [stepKey(steps[0]), stepKey(steps[1])]);
+  equal(ticksForDone(steps, false), []);
+  equal(ticksForDone([], true), []);
+});
+
+// ---------- the Today box ----------
+test('todayLine says how many of today\'s sessions are done and the water so far', () => {
+  equal(todayLine({ sessionCount: 0, doneCount: 0, glasses: 0, goal: 8 }), 'No sessions today · 0 of 8 glasses');
+  equal(todayLine({ sessionCount: 1, doneCount: 1, glasses: 3, goal: 8 }), '1 of 1 session done · 3 of 8 glasses');
+  equal(todayLine({ sessionCount: 2, doneCount: 1, glasses: 8, goal: 8 }), '1 of 2 sessions done · 8 of 8 glasses');
+});
+
+test('mealWhen gives the time today, then Tomorrow, then the weekday', () => {
+  equal(mealWhen({ meal: { time: '12:30', day: 3 }, daysAhead: 0 }), '12:30 PM');
+  equal(mealWhen({ meal: { time: '', day: 3 }, daysAhead: 0 }), 'Today');
+  equal(mealWhen({ meal: { time: '07:00', day: 4 }, daysAhead: 1 }), 'Tomorrow');
+  equal(mealWhen({ meal: { time: '07:00', day: 6 }, daysAhead: 3 }), 'Sat');
+});
+
+test('weekLine rounds the hours to one decimal and says session or sessions', () => {
+  equal(weekLine({ done: 2, planned: 4, hours: 3.46 }), 'This week: 2 of 4 sessions · 3.5 h');
+  equal(weekLine({ done: 0, planned: 1, hours: 0 }), 'This week: 0 of 1 session · 0 h');
+});
+
+// ---------- fencing rating ----------
+test('parseRating reads a letter and a year, and nothing else', () => {
+  equal(parseRating('B26'), { letter: 'B', year: 2026 });
+  equal(parseRating(' b 26 '), { letter: 'B', year: 2026 });
+  equal(parseRating("A'27"), { letter: 'A', year: 2027 });
+  equal(parseRating('C2025'), { letter: 'C', year: 2025 });
+  equal(parseRating('E'), { letter: 'E', year: null });
+  equal([parseRating(''), parseRating('Unrated'), parseRating('F26'), parseRating('B2'), parseRating(null)], [null, null, null, null, null]);
+});
+
+test('the ladder runs U, E, D, C, B, A and labels use the last two digits of the year', () => {
+  equal(RATING_LADDER, ['U', 'E', 'D', 'C', 'B', 'A']);
+  equal(ratingLabel('B', 2027), 'B27');
+});
+
+test('a B26 can aim for an A this year, and renews as B27 from January 1, 2027', () => {
+  const targets = ratingTargets({ letter: 'B', year: 2026 }, new Date(2026, 10, 4));
+  equal(targets.up, { letter: 'A', label: 'A26' });
+  equal([targets.renew.label, targets.renew.available, targets.renew.daysUntil], ['B27', false, 58]);
+  equal(targets.renew.opensOn.getFullYear() + '-' + targets.renew.opensOn.getMonth() + '-' + targets.renew.opensOn.getDate(), '2027-0-1');
+});
+
+test('on January 1 the renewal is available, and an older rating renews for the current year', () => {
+  const january = ratingTargets({ letter: 'B', year: 2026 }, new Date(2027, 0, 1));
+  equal([january.renew.label, january.renew.available, january.renew.daysUntil], ['B27', true, 0]);
+  const old = ratingTargets({ letter: 'C', year: 2024 }, new Date(2026, 5, 10));
+  equal([old.renew.label, old.renew.available], ['C26', true]);
+});
+
+test('an A has nothing higher to aim for, and a rating with no year has no renewal', () => {
+  equal(ratingTargets({ letter: 'A', year: 2026 }, new Date(2026, 5, 1)).up, null);
+  equal(ratingTargets({ letter: 'D', year: null }, new Date(2026, 5, 1)).renew, null);
+});
+
+test('a rating lasts four seasons, then drops a step and carries the year it dropped', () => {
+  const day = (year, month, date) => new Date(year, month, date);
+  const asText = (held) => held.letter + (held.year === null ? '' : String(held.year).slice(-2));
+  // B22 holds through the 2025-26 season and drops on August 1, 2026.
+  const before = currentRating({ letter: 'B', year: 2022 }, day(2026, 6, 31));
+  equal([asText(before), before.dropped, before.expiresOn.getFullYear() + '-' + (before.expiresOn.getMonth() + 1) + '-' + before.expiresOn.getDate()], ['B22', null, '2026-8-1']);
+  const after = currentRating({ letter: 'B', year: 2022 }, day(2026, 7, 1));
+  equal([asText(after), after.dropped.from, after.dropped.on.getFullYear(), after.expiresOn.getFullYear()], ['C26', 'B22', 2026, 2030]);
+});
+
+test('an unrenewed rating keeps dropping every four seasons down to U, and then has no end date', () => {
+  const held = (year, month) => currentRating({ letter: 'B', year: 2022 }, new Date(year, month, 1));
+  equal([held(2030, 7).letter, held(2030, 7).year], ['D', 2030]);
+  equal([held(2034, 7).letter, held(2034, 7).year], ['E', 2034]);
+  const unrated = held(2038, 7);
+  equal([unrated.letter, unrated.year, unrated.expiresOn, unrated.dropped.from], ['U', null, null, 'B22']);
+  equal(held(2060, 0).letter, 'U');
+});
+
+test('a rating with no year, or a U, never expires', () => {
+  equal(currentRating({ letter: 'C', year: null }, new Date(2060, 0, 1)), { letter: 'C', year: null, expiresOn: null, dropped: null });
+  equal(currentRating({ letter: 'U', year: 2020 }, new Date(2060, 0, 1)).dropped, null);
+});
+
+test('goals for a rating are just "Earn" and the label, including for a renewal', () => {
+  equal([earnGoalName('A27'), earnGoalName('B26')], ['Earn A27', 'Earn B26']);
+});
+test('only one rating goal can be on the board at a time', () => {
+  const board = [{ id: 'a', name: 'Earn A27' }, { id: 'b', name: 'Better footwork' }, { id: 'c', name: 'Earn B26', archived: true }];
+  equal([isRatingGoalName('Earn B27'), isRatingGoalName(' earn a27 '), isRatingGoalName('Earn an A rating'), isRatingGoalName('Earn F27')], [true, true, false, false]);
+  equal(ratingGoalConflict(board, 'Earn B27'), 'Earn A27');
+  equal(ratingGoalConflict(board, 'Earn B27', 'a'), null);
+  equal(ratingGoalConflict(board, 'Win a bout'), null);
+  equal(ratingGoalConflict([{ id: 'c', name: 'Earn B26', archived: true }], 'Earn B27'), null);
+});
+
+test('todayItems puts sessions and meals in the order they happen, with all-day first and untimed meals last', () => {
+  // 2026-11-04 is a Wednesday (day 3).
+  const now = new Date(2026, 10, 4, 9, 0);
+  const sessions = [
+    session('s3', '2026-11-04', '15:00', { type: 'bout' }),
+    session('s2', '2026-11-04', '14:00', { type: 'blade' }),
+    session('tourney', '2026-11-04', '', { type: 'tournament' }),
+    session('other', '2026-11-05', '08:00'),
+  ];
+  const meals = [
+    { id: 'm-lunch', day: 3, name: 'Lunch', desc: '', time: '' },
+    { id: 'm-snack', day: 3, name: 'Snack', desc: '', time: '' },
+    { id: 'm-dinner', day: 3, name: 'Dinner', desc: '', time: '18:30' },
+    { id: 'm-tomorrow', day: 4, name: 'Breakfast', desc: '', time: '' },
+  ];
+  const order = todayItems(sessions, meals, now).map((item) => (item.kind === 'session' ? item.session.id : item.meal.id));
+  equal(order, ['tourney', 'm-lunch', 's2', 's3', 'm-dinner', 'm-snack']);
+});
+
+test('todayItems on a tie puts the session before the meal, and adds the next meal when none is planned today', () => {
+  const now = new Date(2026, 10, 4, 9, 0);
+  const tie = todayItems([session('s', '2026-11-04', '12:00')], [{ id: 'm', day: 3, name: 'Lunch', desc: '', time: '12:00' }], now);
+  equal(tie.map((item) => item.kind), ['session', 'meal']);
+  const none = todayItems([], [{ id: 'm', day: 4, name: 'Breakfast', desc: '', time: '' }], now);
+  equal([none.length, none[0].kind, none[0].daysAhead], [1, 'meal', 1]);
+  equal(todayItems([], [], now), []);
 });
 
 const failures = results.filter((r) => r.error);

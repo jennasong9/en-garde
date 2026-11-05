@@ -2,7 +2,7 @@ import { el } from './dom.js';
 import { latestFocus } from './journal.js';
 import { parseIso } from './schedule.js';
 
-// The "Next session focus" strip, shown on the Journal page and on the Schedule: the focus from the
+// The "Next session focus" strip, shown on the Journal page and on the Routines page (so it is in view while doing a session's steps): the focus from the
 // most recent journal entry that has one. It is hidden when no entry has a focus yet. Pass
 // `openJournal` to add an "Open Journal" button (the Journal page does not need one).
 export function renderFocusStrip(strip, entries, { openJournal = null } = {}) {

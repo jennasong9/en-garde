@@ -12,11 +12,15 @@ import { pingToday } from './today-ping.js';
 import { currentFencerLink, disconnectFencerLink, initFencerLinks, saveFencerLink } from './fencer-links.js';
 import { renderGoals } from './goals-page.js';
 import { renderHydration } from './hydration.js';
-import { renderNextMeals } from './next-meals.js';
-import { renderRoutines } from './routines-page.js';
+import { renderTodayTray } from './today-tray.js';
+import { renderRoutines, setSessionStepsDone, showRoutinesDay } from './routines-page.js';
+import { SECTION_TYPES } from './sessionsteps.js';
 import { renderJournal } from './journal-page.js';
 import { renderNutrition } from './nutrition.js';
 import { loadJson, saveJson } from './storage.js';
+import { initProfileMenu, rememberProfile } from './profile-menu.js';
+import { initSettingsPanes } from './settings-panes.js';
+import { initAccent } from './accent.js';
 import { initFont } from './fonts.js';
 import { initTheme } from './theme.js';
 import {
@@ -104,7 +108,6 @@ function describeDay(iso) {
 function renderProfile() {
   $('#fencerName').textContent = profile.name;
   // The Goals page shows the rating, which is kept off the other pages to keep them calm.
-  $('#goalRating').textContent = profile.rating ? 'Rated ' + profile.rating : 'Add your rating';
 }
 
 function renderNextUp() {
@@ -145,14 +148,6 @@ function renderStats() {
   $('#weekRing').setAttribute('aria-label', summary);
   $('#statHours').textContent = String(Math.round(stats.hours * 10) / 10);
   setFoldSummary('thisWeek', summary.replace(' this week', '') + ' · ' + String(Math.round(stats.hours * 10) / 10) + ' h');
-
-  // The small ring in the header keeps the week's progress in view on the other tabs.
-  $('#miniRingCount').textContent = stats.done + '/' + stats.planned;
-  setRing($('#miniRingFill'), 18, fraction);
-  const hours = Math.round(stats.hours * 10) / 10;
-  const hoursText = hours + (hours === 1 ? ' hour' : ' hours') + ' trained';
-  $('#miniRingHours').textContent = hoursText;
-  $('#miniRing').setAttribute('aria-label', summary + ', ' + hoursText + '. Go to Schedule.');
 }
 
 const weekDialog = $('#weekDialog');
@@ -162,7 +157,7 @@ function openCompletedThisWeek() {
   const list = $('#weekList');
   list.replaceChildren();
   if (completed.length === 0) {
-    list.append(el('p', { class: 'empty', text: 'No sessions are marked done yet this week. Open a day and tick "Done" when you finish a session.' }));
+    list.append(el('p', { class: 'empty', text: 'Nothing done yet this week.' }));
   }
   for (const session of completed) {
     const detail = [formatTime(session.time), session.mins ? session.mins + ' min' : '', session.location]
@@ -173,7 +168,7 @@ function openCompletedThisWeek() {
     if (session.notes) card.append(el('p', { class: 'session-notes', text: session.notes }));
     list.append(card);
   }
-  weekDialog.showModal();
+  showDialog(weekDialog);
 }
 
 // ---------- calendar ----------
@@ -560,7 +555,7 @@ function askAboutDuplicate(session, targetIso, existing) {
   const many = existing.length > 1 ? ' (' + existing.length + ' identical sessions)' : '';
   $('#moveDuplicateText').textContent = longDate(targetIso) + ' already has a session with exactly the same details: '
     + detail + many + '. Replace it with the session you are moving, or keep both?';
-  moveDuplicateDialog.showModal();
+  showDialog(moveDuplicateDialog);
 }
 
 function finishPendingMove(replace) {
@@ -678,6 +673,7 @@ function renderAll() {
   renderProfile();
   renderNextUp();
   renderStats();
+  renderTodayTray();
   renderCalendar();
 }
 
@@ -728,6 +724,7 @@ function sessionCard(session) {
   doneBox.checked = session.done;
   doneBox.addEventListener('change', () => {
     session.done = doneBox.checked;
+    setSessionStepsDone(session);
     const spot = doneBox.getBoundingClientRect();
     persist();
     renderAll();
@@ -741,6 +738,9 @@ function sessionCard(session) {
   if (session.notes) card.append(el('p', { class: 'session-notes', text: session.notes }));
   card.append(el('div', { class: 'session-actions' },
     el('label', { class: 'done-toggle' }, doneBox, 'Done'),
+    ...(SECTION_TYPES.includes(session.type)
+      ? [el('button', { class: 'btn ghost small', type: 'button', text: 'Open routine', onclick: () => openRoutine(session) })]
+      : []),
     el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', onclick: () => openForm(session) }),
     el('button', {
       class: 'btn danger small',
@@ -1070,11 +1070,9 @@ $('#dayClose').addEventListener('click', () => dayDialog.close());
 const settingsDialog = $('#settingsDialog');
 const settingsGuard = protectUnsavedChanges(settingsDialog, () => formState($('#profileForm')));
 $('#settingsClose').addEventListener('click', () => settingsDialog.close());
-$('#cancelProfile').addEventListener('click', () => settingsDialog.close());
 
-$('#goalRating').addEventListener('click', () => $('#settingsBtn').click());
-
-$('#settingsBtn').addEventListener('click', () => {
+// Fills the profile form from the saved profile (it appears when "Edit profile" is chosen).
+function fillProfileForm() {
   $('#pName').value = profile.name;
   $('#pClub').value = profile.club;
   $('#pRating').value = profile.rating;
@@ -1082,7 +1080,20 @@ $('#settingsBtn').addEventListener('click', () => {
   $('#pTracker').value = currentFencerLink();
   $('#pTrackerDisconnect').hidden = currentFencerLink() === '';
   $('#profileError').textContent = '';
-  settingsDialog.showModal();
+  settingsGuard.reset();
+}
+
+const settingsPanes = initSettingsPanes({ onOpenProfile: fillProfileForm, onLeaveProfile: fillProfileForm });
+$('#cancelProfile').addEventListener('click', () => settingsPanes.goBack());
+
+function renderProfileSummary() {
+  $('#editProfileSummary').textContent = [profile.name, profile.weapon, profile.club, profile.rating].filter((part) => part).join(' · ');
+}
+
+$('#settingsBtn').addEventListener('click', () => {
+  settingsPanes.reset();
+  renderProfileSummary();
+  showDialog(settingsDialog);
   settingsGuard.reset();
 });
 
@@ -1107,8 +1118,12 @@ $('#profileForm').addEventListener('submit', (event) => {
   }
   profile = { name, club: $('#pClub').value.trim(), rating: $('#pRating').value.trim(), weapon: $('#pWeapon').value };
   saveJson('profile', profile);
+  rememberProfile(profile);
   renderProfile();
-  settingsDialog.close();
+  renderProfileSummary();
+  // The Goals page's rating strip reads the rating, so redraw it now rather than on the next visit.
+  renderGoals();
+  settingsPanes.goBack();
 });
 
 // ---------- calendar navigation ----------
@@ -1132,7 +1147,9 @@ renderTypeFilters();
 renderAll();
 
 initFencerLinks();
+initProfileMenu();
 initTheme();
+initAccent();
 initFont();
 initFoldableCards();
 initHelp();
@@ -1142,11 +1159,20 @@ enableSwitchDrag();
 // ---------- pages ----------
 const PAGES = ['schedule', 'routines', 'nutrition', 'journal', 'goals'];
 
-// The "Open Journal" button on the Schedule's focus strip: goes to the Journal and says so, with a
-// way back, since the page changes under the user.
+// The "Open Journal" button on the Routines page's focus strip: goes to the Journal and says so,
+// with a way back, since the page changes under the user.
 function openJournal() {
   location.hash = '#journal';
-  showToast('Opened your Journal.', { actionLabel: 'Go back', onAction: () => { location.hash = '#schedule'; } });
+  showToast('Opened your Journal.', { actionLabel: 'Go back', onAction: () => { location.hash = '#routines'; } });
+}
+
+// The "Open routine" button on a session: shows that session's day on the Routines page, with a way
+// back, since the page changes under the user. (Rest and Tournament have no routine.)
+function openRoutine(session) {
+  dayDialog.close();
+  showRoutinesDay(session.date);
+  location.hash = '#routines';
+  showToast('Opened Routines.', { actionLabel: 'Go back', onAction: () => { location.hash = '#schedule'; } });
 }
 
 function showPage() {
@@ -1158,25 +1184,37 @@ function showPage() {
     $('#nav' + capitalized).setAttribute('aria-current', name === page ? 'page' : 'false');
   }
   updateSwitch($('.page-nav'), '[aria-current="page"]');
-  renderNextMeals();
-  if (page === 'schedule') {
-    // The Journal's latest "next session focus", with a way to get to the Journal.
-    const journal = loadJson('journal', {});
-    renderFocusStrip($('#scheduleFocus'), journal !== null && typeof journal === 'object' ? journal : {},
-      { openJournal });
-  }
+  renderTodayTray();
   if (page === 'nutrition') {
     renderNutrition();
     renderHydration();
   }
   if (page === 'journal') renderJournal();
   if (page === 'goals') renderGoals();
-  if (page === 'routines') renderRoutines();
+  if (page === 'routines') {
+    renderRoutines();
+    // The Journal's latest "next session focus", right above the steps, with a way to the Journal.
+    const journal = loadJson('journal', {});
+    renderFocusStrip($('#routinesFocus'), journal !== null && typeof journal === 'object' ? journal : {}, { openJournal });
+  }
 }
 window.addEventListener('hashchange', showPage);
+// The Routines screen and the Today box ask for a session's Done box to change. From the Today box
+// (`syncSteps`) the session's Routines steps follow it; from Routines the steps already did.
+document.addEventListener('session-done-change', (event) => {
+  const { id, done, syncSteps, x, y } = event.detail;
+  const session = sessions.find((candidate) => candidate.id === id);
+  if (!session) return;
+  session.done = done;
+  if (syncSteps) setSessionStepsDone(session);
+  persist();
+  renderAll();
+  if (dayDialog.open) renderDay();
+  if (syncSteps && done) burstConfetti(x, y);
+});
 // The next meal changes as the day goes on, so refresh the small list while the app stays open.
-setInterval(renderNextMeals, 60 * 1000);
+setInterval(renderTodayTray, 60 * 1000);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) renderNextMeals();
+  if (!document.hidden) renderTodayTray();
 });
 showPage();

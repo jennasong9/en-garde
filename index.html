@@ -11,37 +11,103 @@
     // Pick the light or dark look before the page is drawn: the saved choice, else the device's.
     (function () {
       var theme = null;
-      try { theme = JSON.parse(localStorage.getItem('engarde_theme')); } catch (error) { theme = null; }
+      var font = null;
+      var accent = null;
+      try {
+        var id = JSON.parse(localStorage.getItem('engarde_acct.active'));
+        if (id) {
+          theme = JSON.parse(localStorage.getItem('engarde_acct.' + id + '.theme'));
+          font = JSON.parse(localStorage.getItem('engarde_acct.' + id + '.font'));
+          accent = JSON.parse(localStorage.getItem('engarde_acct.' + id + '.accent'));
+        }
+      } catch (error) { theme = null; font = null; accent = null; }
       if (theme !== 'dark' && theme !== 'light') {
         theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
       document.documentElement.setAttribute('data-theme', theme);
-      var font = null;
-      try { font = JSON.parse(localStorage.getItem('engarde_font')); } catch (error) { font = null; }
+      var accents = ['ocean', 'lavender', 'rose', 'sand'];
+      document.documentElement.setAttribute('data-accent', accents.indexOf(accent) >= 0 ? accent : 'sage');
       document.documentElement.setAttribute('data-font', font === 'serif' || font === 'mono' ? font : 'sans');
     })();
   </script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="page">
+  <main class="welcome" id="welcome" hidden>
+    <div class="welcome-card">
+      <h1>Welcome to En Garde</h1>
+      <p class="welcome-lead">Your fencing training, saved on this device. Pick your profile or make a new one.</p>
+
+      <section id="wSaved" hidden>
+        <h2>Your profiles</h2>
+        <div class="welcome-profiles" id="wProfiles"></div>
+        <button class="btn ghost" id="wShowNew" type="button">+ Create a new profile</button>
+      </section>
+
+      <form id="wNewForm" novalidate>
+        <h2>Create your profile</h2>
+        <label class="field">Name
+          <input type="text" id="wName" maxlength="60" autocomplete="off" required>
+        </label>
+        <div class="field" role="radiogroup" aria-label="Weapon" id="wWeapon">
+          <span>Weapon</span>
+          <div class="font-options">
+            <button type="button" role="radio" aria-checked="false" class="font-option" data-value="Foil">Foil</button>
+            <button type="button" role="radio" aria-checked="false" class="font-option" data-value="Epee">Epee</button>
+            <button type="button" role="radio" aria-checked="false" class="font-option" data-value="Sabre">Sabre</button>
+          </div>
+        </div>
+
+        <h3>More about you <small>(optional)</small></h3>
+        <label class="field">Club
+          <input type="text" id="wClub" maxlength="80" autocomplete="off">
+        </label>
+        <div class="field-row">
+          <label class="field">Rating
+            <input type="text" id="wRating" maxlength="12" placeholder="e.g. B26" autocomplete="off">
+          </label>
+        </div>
+        <label class="field">FencingTracker profile link
+          <input type="text" id="wTracker" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://fencingtracker.com/p/123456/Your-Name">
+        </label>
+
+        <h3>Preferences <small>(optional, change any time in Settings)</small></h3>
+        <div class="field" role="radiogroup" aria-label="Look" id="wTheme">
+          <span>Look</span>
+          <div class="font-options">
+            <button type="button" role="radio" aria-checked="true" class="font-option" data-value="auto">Match my device</button>
+            <button type="button" role="radio" aria-checked="false" class="font-option" data-value="light">Light</button>
+            <button type="button" role="radio" aria-checked="false" class="font-option" data-value="dark">Dark</button>
+          </div>
+        </div>
+        <div class="field" role="radiogroup" aria-label="Font" id="wFont">
+          <span>Font</span>
+          <div class="font-options">
+            <button type="button" role="radio" aria-checked="false" class="font-option" data-font="serif" data-value="serif">Serif</button>
+            <button type="button" role="radio" aria-checked="true" class="font-option" data-font="sans" data-value="sans">Sans-serif</button>
+            <button type="button" role="radio" aria-checked="false" class="font-option" data-font="mono" data-value="mono">Mono</button>
+          </div>
+        </div>
+        <label class="switch-row" for="wMealReminders"><span>Remind me before meals</span><input type="checkbox" role="switch" id="wMealReminders" class="switch-toggle"></label>
+        <label class="switch-row" for="wWaterReminders"><span>Remind me to drink water</span><input type="checkbox" role="switch" id="wWaterReminders" class="switch-toggle"></label>
+
+        <p class="form-error" id="wError" role="alert"></p>
+        <button class="btn" type="submit">Start training</button>
+      </form>
+    </div>
+  </main>
+
+  <div class="page" hidden>
     <header class="masthead">
       <h1 id="fencerName"></h1>
       <div class="masthead-side">
-        <a class="mini-meals" id="miniMeals" href="#nutrition">
-          <span class="mini-meals-title">Next meals</span>
-          <ul class="mini-meals-list" id="miniMealList"></ul>
-        </a>
-        <a class="mini-ring" id="miniRing" href="#schedule">
-          <span class="mini-ring-dial">
-            <svg viewBox="0 0 44 44" aria-hidden="true">
-              <circle class="mini-track" cx="22" cy="22" r="18"></circle>
-              <circle class="mini-fill" id="miniRingFill" cx="22" cy="22" r="18"></circle>
-            </svg>
-            <span class="mini-count" id="miniRingCount">0/0</span>
-          </span>
-          <span class="mini-label" id="miniRingHours">0 hours trained</span>
-        </a>
+        <section class="today-tray foldable" data-fold="today" aria-label="Today">
+          <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h2>Today</h2><span class="chevron" aria-hidden="true"></span></button>
+          <span class="fold-summary"></span>
+          <div class="fold"><div class="fold-inner">
+            <div class="today-body" id="todayBody"></div>
+          </div></div>
+        </section>
         <button class="settings-btn" id="settingsBtn" type="button" aria-label="Settings" title="Settings">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M9.78 4.73 L10.23 1.95 L13.77 1.95 L14.22 4.73 L15.57 5.29 L17.85 3.64 L20.36 6.15 L18.71 8.43 L19.27 9.78 L22.05 10.23 L22.05 13.77 L19.27 14.22 L18.71 15.57 L20.36 17.85 L17.85 20.36 L15.57 18.71 L14.22 19.27 L13.77 22.05 L10.23 22.05 L9.78 19.27 L8.43 18.71 L6.15 20.36 L3.64 17.85 L5.29 15.57 L4.73 14.22 L1.95 13.77 L1.95 10.23 L4.73 9.78 L5.29 8.43 L3.64 6.15 L6.15 3.64 L8.43 5.29 Z"></path>
@@ -100,9 +166,8 @@
           <button class="icon-btn" id="nextBtn" type="button">&#8250;</button>
         </div>
       </div>
-      <div class="focus-strip" id="scheduleFocus" hidden></div>
       <div class="view-switch" id="viewSwitch" role="group" aria-label="Calendar view"></div>
-<div class="help-panel" id="scheduleHelp"><ul><li>Press "+ Add session" to add one for today</li><li>Click or tap any day to see or add its sessions</li><li>Use the colored buttons below the calendar to filter by type</li></ul></div>
+<div class="help-panel" id="scheduleHelp"><ul><li>Tap a day to add a session</li><li>Colored buttons filter by type</li></ul></div>
       <div id="monthView">
       <div class="weekdays" aria-hidden="true">
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
@@ -117,19 +182,15 @@
     <section id="goalsPage" class="card" aria-label="Goals" hidden>
       <div class="calendar-head">
         <div>
-          <div class="head-title"><h2>Goals</h2><button class="rating-badge" id="goalRating" type="button" title="Change your rating in Settings"></button><button class="help-btn" type="button" data-help="goalsHelp" aria-expanded="false" aria-label="Tips for Goals">?</button></div>
+          <div class="head-title"><h2>Goals</h2><button class="help-btn" type="button" data-help="goalsHelp" aria-expanded="false" aria-label="Tips for Goals">?</button></div>
           <p class="goal-summary" id="goalSummary"></p>
         </div>
         <button class="btn" id="addGoalBtn" type="button">+ Pin a new goal</button>
       </div>
-<div class="help-panel" id="goalsHelp"><ul><li>Add a goal with the button above</li><li>Tap or drag along a goal's bars to track progress</li><li>Card size changes how big the cards are</li></ul></div>
-      <div class="filters goal-filters" id="goalFilters" role="group" aria-label="Filter goals by tag"></div>
-      <div class="goal-options">
-        <label class="switch-row goal-option" for="hideCompleted">
-          <span>Hide completed</span>
-          <input type="checkbox" role="switch" id="hideCompleted" class="switch-toggle">
-        </label>
-        <span class="goal-hidden-note" id="goalHiddenNote"></span>
+<div class="help-panel" id="goalsHelp"><ul><li>Tap or drag a goal's bars to track it</li></ul></div>
+      <section class="rating-strip" id="ratingStrip" aria-label="Fencing rating"></section>
+      <div class="goal-controls">
+        <div class="filters goal-filters" id="goalFilters" role="group" aria-label="Filter goals by tag"></div>
         <div class="goal-size">
           <span id="goalSizeLabel">Card size</span>
           <div class="view-switch" id="goalSizeSwitch" role="group" aria-labelledby="goalSizeLabel"></div>
@@ -178,7 +239,7 @@
           </label>
         </div>
       </div>
-      <p class="hint" id="sortHint" hidden>Drag the handle on an entry (or press the up and down arrow keys on it) to arrange your entries.</p>
+      <p class="hint" id="sortHint" hidden>Drag the handle to reorder.</p>
       <div id="journalCalendar">
         <div class="weekdays" aria-hidden="true">
           <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
@@ -207,7 +268,8 @@
           <button class="icon-btn" id="routineNext" type="button" aria-label="Next day">&#8250;</button>
         </div>
       </div>
-<div class="help-panel" id="routinesHelp"><ul><li>Tick steps off as you go</li><li>Steps belong to a session type, so changing one changes every session of that type</li></ul></div>
+<div class="focus-strip" id="routinesFocus" hidden></div>
+<div class="help-panel" id="routinesHelp"><ul><li>Tick steps off as you go</li><li>Steps belong to one session; save them as a routine to reuse</li></ul></div>
       <label class="switch-row routine-option" for="strikeToggle">
         <span>Strikethrough completed steps</span>
         <input type="checkbox" role="switch" id="strikeToggle" class="switch-toggle">
@@ -254,7 +316,7 @@
             </div>
           </div>
         </div>
-        <div class="help-panel" id="mealsHelp"><ul><li>Tap a meal to edit or copy it</li><li>Tick a meal once it's prepped</li><li>Tap a day's heading to fold it away</li><li>The plan repeats every week</li></ul></div>
+        <div class="help-panel" id="mealsHelp"><ul><li>Tap a meal to edit it</li><li>Tick a meal when prepped</li><li>The plan repeats weekly</li></ul></div>
         <p class="status" id="mealStatus" role="status"></p>
         <div class="meal-scroll"><div class="meal-grid" id="mealGrid"></div></div>
       </section>
@@ -420,6 +482,8 @@
       <label class="field">Notes (optional)
         <textarea id="jText" class="journal-text" maxlength="2000" placeholder="Anything else: pain, energy, food, how a bout went..."></textarea>
       </label>
+      <div id="videoReview"></div>
+      <input type="hidden" id="jVideoState">
       <p class="form-error" id="journalError" role="alert"></p>
       <div class="form-actions">
         <button class="btn danger" id="journalDelete" type="button" hidden>Delete</button>
@@ -546,6 +610,34 @@
     <ul class="plan-list" id="planList"></ul>
   </dialog>
 
+  <dialog id="saveRoutineDialog" aria-labelledby="saveRoutineTitle">
+    <div class="dialog-head">
+      <h2 id="saveRoutineTitle">Save routine</h2>
+      <button class="icon-btn" id="saveRoutineClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="saveRoutineForm" novalidate>
+      <p class="tracker-help">Saves these steps so you can load them again for another session later.</p>
+      <label class="field">Routine name
+        <input type="text" id="routineName" maxlength="60">
+      </label>
+      <p class="series-note" id="saveRoutineSummary"></p>
+      <p class="form-error" id="saveRoutineError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn ghost" id="saveRoutineCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Save routine</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="loadRoutineDialog" aria-labelledby="loadRoutineTitle">
+    <div class="dialog-head">
+      <h2 id="loadRoutineTitle">Load routine</h2>
+      <button class="icon-btn" id="loadRoutineClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p class="tracker-help" id="loadRoutineHelp">Loading a routine replaces the steps now in this session type. Save them first if you want to keep them.</p>
+    <ul class="plan-list" id="routineList"></ul>
+  </dialog>
+
   <dialog id="copyDialog" aria-labelledby="copyTitle">
     <div class="dialog-head">
       <h2 id="copyTitle"></h2>
@@ -578,70 +670,111 @@
     </div>
   </dialog>
 
+  <dialog id="videoDialog" class="video-dialog" aria-labelledby="videoTitle">
+    <div class="dialog-head">
+      <h2 id="videoTitle"></h2>
+      <button class="icon-btn" id="videoClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <div id="videoBody"></div>
+  </dialog>
+
   <dialog id="settingsDialog" aria-labelledby="settingsTitle">
     <div class="dialog-head">
+      <button class="icon-btn" id="settingsBack" type="button" aria-label="Back to Settings" hidden>&#8249;</button>
       <h2 id="settingsTitle">Settings</h2>
       <button class="icon-btn" id="settingsClose" type="button" aria-label="Close">&#10005;</button>
     </div>
 
-    <section class="settings-section" aria-labelledby="appearanceTitle">
-      <h3 id="appearanceTitle">Appearance</h3>
-      <label class="switch-row" for="darkModeToggle">
-        <span>Dark mode</span>
-        <input type="checkbox" role="switch" id="darkModeToggle" class="switch-toggle">
-      </label>
-      <div class="font-picker" role="radiogroup" aria-labelledby="fontLabel">
-        <span id="fontLabel">Change font</span>
-        <div class="font-options">
-          <button type="button" role="radio" class="font-option" data-font="serif">Serif</button>
-          <button type="button" role="radio" class="font-option" data-font="sans">Sans-serif</button>
-          <button type="button" role="radio" class="font-option" data-font="mono">Mono</button>
-        </div>
-      </div>
-    </section>
+    <div id="settingsMain">
+      <button class="settings-row" id="editProfileRow" type="button">
+        <span class="settings-row-text"><strong>Edit profile</strong><span id="editProfileSummary"></span></span>
+        <span class="chevron-right" aria-hidden="true"></span>
+      </button>
 
-    <section class="settings-section" aria-labelledby="remindersTitle">
-      <h3 id="remindersTitle">Reminders</h3>
-      <p class="tracker-help">Reminders pop up while En Garde is open in a browser tab.</p>
-      <label class="switch-row" for="remMeals">
-        <span>Meal reminders</span>
-        <input type="checkbox" role="switch" id="remMeals" class="switch-toggle">
-      </label>
-      <label class="field" id="remLeadField">Remind me before a meal
-        <select id="remLead"></select>
-      </label>
-      <label class="switch-row" for="remWater">
-        <span>Water reminders</span>
-        <input type="checkbox" role="switch" id="remWater" class="switch-toggle">
-      </label>
-      <div id="remWaterOptions">
-        <label class="field">Every
-          <select id="remEvery"></select>
-        </label>
-        <div class="field-row">
-          <label class="field">From
-            <input type="time" id="remFrom">
+      <section class="settings-section settings-fold" data-fold="appearance" aria-labelledby="appearanceTitle">
+        <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h3 id="appearanceTitle">Appearance</h3><span class="chevron" aria-hidden="true"></span></button>
+        <div class="fold"><div class="fold-inner">
+          <label class="switch-row" for="darkModeToggle">
+            <span>Dark mode</span>
+            <input type="checkbox" role="switch" id="darkModeToggle" class="switch-toggle">
           </label>
-          <label class="field">Until
-            <input type="time" id="remTo">
+          <div class="accent-picker" role="radiogroup" aria-labelledby="accentLabel">
+            <span id="accentLabel">Color</span>
+            <div class="accent-options">
+              <button type="button" role="radio" class="accent-option" data-accent="sage"><span class="accent-dot"></span>Sage</button>
+              <button type="button" role="radio" class="accent-option" data-accent="ocean"><span class="accent-dot"></span>Ocean</button>
+              <button type="button" role="radio" class="accent-option" data-accent="lavender"><span class="accent-dot"></span>Lavender</button>
+              <button type="button" role="radio" class="accent-option" data-accent="rose"><span class="accent-dot"></span>Rose</button>
+              <button type="button" role="radio" class="accent-option" data-accent="sand"><span class="accent-dot"></span>Sand</button>
+            </div>
+          </div>
+          <div class="font-picker" role="radiogroup" aria-labelledby="fontLabel">
+            <span id="fontLabel">Change font</span>
+            <div class="font-options">
+              <button type="button" role="radio" class="font-option" data-font="serif">Serif</button>
+              <button type="button" role="radio" class="font-option" data-font="sans">Sans-serif</button>
+              <button type="button" role="radio" class="font-option" data-font="mono">Mono</button>
+            </div>
+          </div>
+        </div></div>
+      </section>
+
+      <section class="settings-section settings-fold" data-fold="reminders" aria-labelledby="remindersTitle">
+        <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h3 id="remindersTitle">Reminders</h3><span class="chevron" aria-hidden="true"></span></button>
+        <div class="fold"><div class="fold-inner">
+          <p class="tracker-help">Reminders pop up while En Garde is open in a browser tab.</p>
+          <label class="switch-row" for="remMeals">
+            <span>Meal reminders</span>
+            <input type="checkbox" role="switch" id="remMeals" class="switch-toggle">
           </label>
-        </div>
-      </div>
-      <label class="switch-row" for="remNotify">
-        <span>Also show a notification</span>
-        <input type="checkbox" role="switch" id="remNotify" class="switch-toggle">
-      </label>
-      <p class="series-note" id="remNote" role="status"></p>
-      <button class="btn ghost" id="remTest" type="button">Send a test reminder</button>
-    </section>
+          <label class="field" id="remLeadField">Remind me before a meal
+            <select id="remLead"></select>
+          </label>
+          <label class="switch-row" for="remWater">
+            <span>Water reminders</span>
+            <input type="checkbox" role="switch" id="remWater" class="switch-toggle">
+          </label>
+          <div id="remWaterOptions">
+            <label class="field">Every
+              <select id="remEvery"></select>
+            </label>
+            <div class="field-row">
+              <label class="field">From
+                <input type="time" id="remFrom">
+              </label>
+              <label class="field">Until
+                <input type="time" id="remTo">
+              </label>
+            </div>
+          </div>
+          <label class="switch-row" for="remNotify">
+            <span>Also show a notification</span>
+            <input type="checkbox" role="switch" id="remNotify" class="switch-toggle">
+          </label>
+          <p class="series-note" id="remNote" role="status"></p>
+          <button class="btn ghost" id="remTest" type="button">Send a test reminder</button>
+        </div></div>
+      </section>
 
-    <section class="settings-section" aria-labelledby="linksTitle">
-      <h3 id="linksTitle">Links</h3>
-      <p class="fencer-links" id="fencerLinks"></p>
-    </section>
+      <section class="settings-section settings-fold" data-fold="links" aria-labelledby="linksTitle">
+        <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h3 id="linksTitle">Links</h3><span class="chevron" aria-hidden="true"></span></button>
+        <div class="fold"><div class="fold-inner">
+          <p class="fencer-links" id="fencerLinks"></p>
+        </div></div>
+      </section>
 
-    <section class="settings-section" aria-labelledby="profileTitle">
-      <h3 id="profileTitle">Edit profile</h3>
+      <section class="settings-section settings-fold" data-fold="profiles" aria-labelledby="profilesTitle">
+        <button class="meal-day-toggle fold-title" type="button" aria-expanded="true"><h3 id="profilesTitle">Profiles</h3><span class="chevron" aria-hidden="true"></span></button>
+        <div class="fold"><div class="fold-inner">
+              <div class="profile-actions">
+                <button class="btn ghost" id="switchProfile" type="button">Switch profile</button>
+                <button class="btn danger" id="deleteProfile" type="button">Delete profile</button>
+              </div>
+        </div></div>
+      </section>
+    </div>
+
+    <div id="settingsProfile" hidden>
       <form id="profileForm" novalidate>
         <label class="field">Name
           <input type="text" id="pName" maxlength="60" required>
@@ -667,13 +800,13 @@
         <button class="btn danger small" id="pTrackerDisconnect" type="button" hidden>Disconnect FencingTracker</button>
         <p class="form-error" id="profileError" role="alert"></p>
         <div class="form-actions">
-          <button class="btn ghost" id="cancelProfile" type="button">Close</button>
+          <button class="btn ghost" id="cancelProfile" type="button">Cancel</button>
           <button class="btn" type="submit">Save profile</button>
         </div>
       </form>
-    </section>
+    </div>
   </dialog>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/start.js"></script>
 </body>
 </html>

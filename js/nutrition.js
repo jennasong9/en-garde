@@ -1,3 +1,4 @@
+import { showDialog } from './dialog-motion.js';
 import { burstConfetti } from './confetti.js';
 import { setFoldSummary } from './foldable-cards.js';
 import { foldBody, setFolded } from './fold.js';
@@ -35,7 +36,7 @@ import { makeId, formatTime } from './schedule.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import { initExportPlan } from './export-plan.js';
 import { buildMenu, setupMenu } from './menu.js';
-import { renderNextMeals } from './next-meals.js';
+import { renderTodayTray } from './today-tray.js';
 import { loadJson, saveJson } from './storage.js';
 
 const stored = loadJson('meals', []);
@@ -102,8 +103,20 @@ $('#expandAllBtn').addEventListener('click', () => {
   }
 });
 
+// The Today box asks for a meal's Prepped tick to change; confetti when that finishes the day.
+document.addEventListener('meal-prepped-change', (event) => {
+  const { id, prepped, x, y } = event.detail;
+  const meal = meals.find((candidate) => candidate.id === id);
+  if (!meal) return;
+  const wasDone = allPrepped(dayTotals(meals, meal.day));
+  meal.prepped = prepped;
+  persist();
+  renderNutrition();
+  if (!wasDone && allPrepped(dayTotals(meals, meal.day))) burstConfetti(x, y);
+});
+
 export function renderNutrition() {
-  renderNextMeals();
+  renderTodayTray();
   renderMacroTargets();
   const today = new Date().getDay();
   $('#mealGrid').replaceChildren(...WEEK_ORDER.map((day) => dayColumn(DAY_NAMES[day], day, day === today)), historyPanel());
@@ -217,7 +230,7 @@ function renderMacroTargets() {
     ? 'No targets set yet'
     : MACROS.map((macro) => MACRO_LABELS[macro][0] + ' ' + (macroTargets[macro] || 0)).join(' · ') + ' g · about ' + kcal.toLocaleString() + ' kcal');
   $('#macroTotal').textContent = kcal === 0
-    ? 'No targets set yet. Enter your daily grams above.'
+    ? 'No targets set yet.'
     : 'These targets add up to about ' + kcal.toLocaleString() + ' kcal a day.';
 }
 
@@ -501,7 +514,7 @@ function openMealForm(meal, day) {
   const deleteButton = $('#mealDelete');
   deleteButton.hidden = !meal;
   deleteButton.textContent = 'Delete';
-  mealDialog.showModal();
+  showDialog(mealDialog);
   mealGuard.reset();
   $('#mName').focus();
 }
@@ -551,7 +564,7 @@ $('#mealForm').addEventListener('submit', (event) => {
   pendingEdit = { meal, fields };
   $('#linkedMealText').textContent = 'This meal is also on ' + dayList(others)
     + '. Apply your changes to all of those days, or just to ' + DAY_NAMES[meal.day] + '?';
-  linkedMealDialog.showModal();
+  showDialog(linkedMealDialog);
 });
 
 function finishMealSave(savedMeal) {
@@ -631,7 +644,7 @@ $('#savePlanBtn').addEventListener('click', () => {
   $('#savePlanSummary').textContent = meals.length === 0
     ? 'There are no meals in this week yet, so there is nothing to save.'
     : 'This will save ' + planSummary({ meals }) + '.';
-  savePlanDialog.showModal();
+  showDialog(savePlanDialog);
   savePlanGuard.reset();
   $('#planName').select();
 });
@@ -660,14 +673,14 @@ setupMenu($('#planMenu'));
 $('#loadPlanBtn').addEventListener('click', () => {
   confirming = null;
   renderPlanList();
-  loadPlanDialog.showModal();
+  showDialog(loadPlanDialog);
 });
 
 function renderPlanList() {
   const list = $('#planList');
   $('#loadPlanHelp').hidden = savedPlans.length === 0;
   if (savedPlans.length === 0) {
-    list.replaceChildren(el('li', { class: 'empty', text: 'No saved plans yet. Use "Save weekly meal plan" to keep one.' }));
+    list.replaceChildren(el('li', { class: 'empty', text: 'No saved plans yet.' }));
     return;
   }
   list.replaceChildren(...savedPlans.map((plan) => {
@@ -772,7 +785,7 @@ function openCopy(source) {
       },
     });
   }));
-  copyDialog.showModal();
+  showDialog(copyDialog);
   copyGuard.reset();
 }
 

@@ -68,9 +68,9 @@ export function matchesTag(goal, activeTags) {
   return activeTags.size === 0 || activeTags.has(goal.tag);
 }
 
-// The goals to show: those matching the tag filter, minus finished ones when `hideCompleted` is on.
-export function visibleGoals(goals, activeTags, hideCompleted) {
-  return sortGoals(goals).filter((goal) => matchesTag(goal, activeTags) && !(hideCompleted && goal.progress >= 100));
+// The goals to show: those matching the tag filter, in order.
+export function visibleGoals(goals, activeTags) {
+  return sortGoals(goals).filter((goal) => matchesTag(goal, activeTags));
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;

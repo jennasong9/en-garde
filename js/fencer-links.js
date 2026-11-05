@@ -1,3 +1,4 @@
+import { showDialog } from './dialog-motion.js';
 import { $, el, formState, protectUnsavedChanges } from './dom.js';
 import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
 import { loadJson, saveJson } from './storage.js';
@@ -32,7 +33,7 @@ function openDialog() {
   $('#trackerInput').value = link;
   $('#trackerError').textContent = '';
   $('#trackerDisconnect').hidden = link === '';
-  trackerDialog.showModal();
+  showDialog(trackerDialog);
   trackerGuard.reset();
   $('#trackerInput').focus();
 }

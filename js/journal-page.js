@@ -6,6 +6,8 @@ import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedCh
 import { FEELINGS, SHORT_FIELDS, SORT_OPTIONS, entryParts, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import { SESSION_TYPES, formatTime, parseIso, sessionsOn, shiftAnchor, toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
+import { createVideoReview } from './video-review-ui.js';
+import { deleteVideo } from './videostore.js';
 
 const stored = loadJson('journal', {});
 let entries = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
@@ -176,7 +178,7 @@ function renderList() {
     container.append(el('p', {
       class: 'empty',
       text: none
-        ? 'No journal entries yet. Switch to Calendar and tap a day to write your first one.'
+        ? 'No entries yet.'
         : 'No entries. Tap "Show all" to reset.',
     }));
     return;
@@ -212,6 +214,10 @@ function entryCard(entry) {
   const times = writtenText(entry);
   if (times) card.append(el('p', { class: 'journal-entry-times', text: times }));
   if (entry.sessionLabel) card.append(el('p', { class: 'journal-entry-session', text: entry.sessionLabel }));
+  if (entry.video) {
+    const count = (entry.videoNotes || []).length;
+    card.append(el('p', { class: 'journal-entry-video', text: '▶ Video review' + (count ? ' · ' + count + (count === 1 ? ' note' : ' notes') : '') }));
+  }
   const text = el('p', { class: 'journal-entry-text clamped' });
   fillEntryText(text, entry);
   card.append(
@@ -401,6 +407,10 @@ function fillSessionChoices(iso, entry) {
   $('#jSession').disabled = choices.length === 1 && sessions.length === 0;
 }
 
+const videoReview = createVideoReview($('#videoReview'), () => {
+  $('#jVideoState').value = videoReview.stateText();
+});
+
 // `origin` is the calendar date the pop-up grows out of, when it was opened from one.
 function openEntry(iso, origin = null) {
   const entry = entries[iso];
@@ -416,11 +426,13 @@ function openEntry(iso, origin = null) {
   deleteButton.hidden = !entry;
   deleteButton.textContent = 'Delete';
   renderFeelingPicker();
+  videoReview.show(entry);
+  $('#jVideoState').value = videoReview.stateText();
   showDialog(journalDialog, origin);
   journalGuard.reset();
 }
 
-$('#journalForm').addEventListener('submit', (event) => {
+$('#journalForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const entry = { feeling: selectedFeeling, text: $('#jText').value.trim() };
   for (const field of SHORT_FIELDS) entry[field.key] = $('#j-' + field.key).value.trim();
@@ -430,6 +442,17 @@ $('#journalForm').addEventListener('submit', (event) => {
     return;
   }
   const before = entries[dialogDate];
+  let review;
+  try {
+    review = await videoReview.collect();
+  } catch (failure) {
+    $('#journalError').textContent = failure.message;
+    return;
+  }
+  const oldFileId = before?.video?.kind === 'file' ? before.video.id : null;
+  if (oldFileId && oldFileId !== review.video?.id) deleteVideo(oldFileId).catch(() => {});
+  entry.video = review.video;
+  entry.videoNotes = review.videoNotes;
   // The chosen session is kept as its id and as a label, so the entry still reads right if the
   // session is later removed from the Schedule.
   const chosen = $('#jSession').value;
@@ -438,9 +461,10 @@ $('#journalForm').addEventListener('submit', (event) => {
   entry.sessionLabel = session && SESSION_TYPES[session.type] ? sessionLabel(session) : chosen && before ? before.sessionLabel : '';
   const now = new Date().toISOString();
   const keys = ['feeling', 'text', 'sessionId', ...SHORT_FIELDS.map((field) => field.key)];
+  const videoChanged = JSON.stringify([before?.video ?? null, before?.videoNotes ?? []]) !== JSON.stringify([entry.video, entry.videoNotes]);
   if (!before) {
     entries[dialogDate] = { ...entry, createdAt: now, editedAt: now };
-  } else if (keys.some((key) => (before[key] || '') !== entry[key])) {
+  } else if (videoChanged || keys.some((key) => (before[key] || '') !== entry[key])) {
     entries[dialogDate] = { ...before, ...entry, editedAt: now };
   }
   persist();
@@ -455,12 +479,14 @@ $('#journalDelete').addEventListener('click', () => {
     $('#journalDelete').textContent = 'Really delete?';
     return;
   }
+  if (entries[dialogDate]?.video?.kind === 'file') deleteVideo(entries[dialogDate].video.id).catch(() => {});
   delete entries[dialogDate];
   persist();
   journalDialog.close();
   renderJournal();
 });
 
+journalDialog.addEventListener('close', () => videoReview.stop());
 const journalGuard = protectUnsavedChanges(journalDialog, () => formState($('#journalForm')));
 $('#journalClose').addEventListener('click', () => journalDialog.close());
 $('#journalCancel').addEventListener('click', () => journalDialog.close());

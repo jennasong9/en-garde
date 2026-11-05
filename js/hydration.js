@@ -4,6 +4,7 @@ import { setFoldSummary } from './foldable-cards.js';
 import { DEFAULT_GLASS_GOAL, MAX_GLASS_GOAL, glassesToday, reachedWaterGoal, tapGlass } from './meals.js';
 import { toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
+import { renderTodayTray } from './today-tray.js';
 
 // Today's water count. It is saved with its date so a new day starts at zero.
 const stored = loadJson('hydration', {});
@@ -28,10 +29,13 @@ export function waterStatus() {
 
 // Adds one glass (the "+1 glass" button on a water reminder). Confetti pops near the reminder when
 // that glass reaches the goal.
-export function addGlass() {
+export function addGlass(x = 120, y = window.innerHeight - 80) {
   const glasses = currentGlasses();
-  if (glasses < hydration.goal) setGlasses(glasses + 1, 120, window.innerHeight - 80);
+  if (glasses < hydration.goal) setGlasses(glasses + 1, x, y);
 }
+
+// The "+1 glass" button in the Today box.
+document.addEventListener('water-add', (event) => addGlass(event.detail.x, event.detail.y));
 
 export function renderHydration() {
   const glasses = currentGlasses();
@@ -43,6 +47,7 @@ export function renderHydration() {
   }, dropIcon())));
   showGlasses(glasses);
   if (document.activeElement !== $('#glassGoal')) $('#glassGoal').value = hydration.goal;
+  renderTodayTray();
 }
 
 // Shows `glasses` filled drops and the count, without saving (used while dragging).

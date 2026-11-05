@@ -19,6 +19,7 @@ import {
   visibleGoals,
 } from './goals.js';
 import { setSwitchButtons } from './pill.js';
+import { RATING_LADDER, currentRating, earnGoalName, parseRating, ratingGoalConflict, ratingTargets } from './rating.js';
 import { makeId, parseIso, toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
 
@@ -26,13 +27,14 @@ const stored = loadJson('goals', []);
 let goals = Array.isArray(stored) ? stored : [];
 
 const activeTags = new Set();
-let hideCompleted = loadJson('goalsHideCompleted', false) === true;
 const goalDialog = $('#goalDialog');
 let editingGoalId = null;
 let selectedTag = '';
 let confirmingDeleteId = null;
 let confirmingArchivedDeleteId = null;
 let confirmingDeleteInDialog = false;
+// Goals whose long name is opened out (a card shows two lines of a name unless opened).
+const openedNames = new Set();
 
 function persist() {
   saveJson('goals', goals);
@@ -64,9 +66,9 @@ export function renderGoals() {
   $('#goalSummary').textContent = onBoard.length === 0
     ? 'Nothing pinned yet.'
     : onBoard.length - finished + ' in progress · ' + finished + ' completed';
+  ratingError = '';
+  renderRatingStrip();
   renderTagFilters();
-  $('#hideCompleted').checked = hideCompleted;
-  $('#goalHiddenNote').textContent = hideCompleted && finished > 0 ? plural(finished, 'completed goal') + ' hidden' : '';
   renderBoard();
   renderArchive();
 }
@@ -96,26 +98,106 @@ function renderTagFilters() {
   $('#goalFilters').replaceChildren(...buttons);
 }
 
+// ---------- the fencing rating strip ----------
+// Shows the rating ladder (U to A) with the fencer's rating on it, and what to aim for next: the
+// next letter up, and earning the same letter again for the new year. Each can be pinned as a goal.
+const openRatingSettings = () => {
+  $('#settingsBtn').click();
+  $('#editProfileRow').click();
+};
+
+// A message under the rating strip when a second rating goal is attempted; cleared on the next redraw.
+let ratingError = '';
+
+const ratingConflictMessage = (existing) => 'You already have a rating goal: ' + existing + '. Finish or delete it before adding another.';
+
+function pinRatingGoal(name, due) {
+  const existing = ratingGoalConflict(boardGoals(goals), name);
+  if (existing) {
+    ratingError = ratingConflictMessage(existing);
+    renderRatingStrip();
+    return;
+  }
+  goals.push({ id: makeId(), progress: 0, name, tag: 'competition', due });
+  persist();
+  renderGoals();
+}
+
+// An "Earn A26" button. Pressing it adds that goal, due December 31 of its year; once the goal is on
+// the board it reads "Earn A26 ✓" and pressing it again takes the goal off the board.
+function earnButton(label) {
+  const goalName = earnGoalName(label);
+  const onBoard = boardGoals(goals).find((goal) => goal.name === goalName);
+  const yearEnd = toIso(new Date(2000 + Number(label.slice(1)), 11, 31));
+  return el('button', {
+    class: 'btn ghost small rating-earn',
+    type: 'button',
+    text: onBoard ? goalName + ' ✓' : goalName,
+    title: onBoard ? 'Press again to remove this goal' : '',
+    'aria-label': onBoard ? goalName + ' is on your board. Press to remove it.' : 'Add the goal ' + goalName,
+    ...(onBoard ? { 'aria-pressed': 'true' } : {}),
+    onclick: () => (onBoard ? deleteGoal(onBoard.id) : pinRatingGoal(goalName, yearEnd)),
+  });
+}
+
+const shortDate = (date) => date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+function renderRatingStrip() {
+  const strip = $('#ratingStrip');
+  const saved = parseRating(loadJson('profile', {}).rating);
+  // What the fencer holds today: a rating that ran out has dropped a step since it was typed in.
+  const held = saved ? currentRating(saved, new Date()) : null;
+  const currentIndex = held ? RATING_LADDER.indexOf(held.letter) : -1;
+  const targets = held ? ratingTargets(held, new Date()) : null;
+
+  const ladder = el('ol', { class: 'rating-ladder', 'aria-label': 'Ratings from lowest to highest' },
+    ...RATING_LADDER.map((letter, index) => {
+      const state = index === currentIndex ? 'current' : index < currentIndex ? 'earned' : index === currentIndex + 1 && held ? 'next' : 'later';
+      const label = index === currentIndex && held.year ? letter + String(held.year).slice(-2) : letter;
+      return el('li', { class: 'rating-step ' + state, text: label, ...(state === 'current' ? { 'aria-current': 'true' } : {}) });
+    }));
+
+  const head = el('div', { class: 'rating-head' },
+    el('h3', { text: 'Your rating' }),
+    el('button', { class: 'link-btn small', type: 'button', text: saved ? 'Edit' : 'Add your rating', onclick: openRatingSettings }));
+  strip.replaceChildren(head);
+  if (!saved) {
+    strip.append(ladder, el('p', { class: 'rating-note', text: 'Add your rating to see your path from U up to A.' }));
+    return;
+  }
+
+  // The ladder with the goals you can add, in one row: aim up, or earn the same rating for next year.
+  const buttons = [];
+  if (targets.up) buttons.push(earnButton(targets.up.label));
+  if (targets.renew) buttons.push(earnButton(targets.renew.label));
+  strip.append(el('div', { class: 'rating-row' }, ladder, el('div', { class: 'rating-earn-buttons' }, ...buttons)));
+
+  // A rating lasts four seasons: say when it runs out, or that it already dropped.
+  const notes = [];
+  if (held.dropped) {
+    const heldLabel = held.letter === 'U' ? 'U (unrated)' : held.letter + String(held.year).slice(-2);
+    notes.push('Your ' + held.dropped.from + ' dropped to ' + heldLabel + ' on ' + shortDate(held.dropped.on) + '.');
+  }
+  if (held.expiresOn) notes.push('Expires ' + shortDate(held.expiresOn) + '.');
+  if (notes.length > 0) strip.append(el('p', { class: 'rating-note' + (held.dropped ? ' rating-warn' : ''), text: notes.join(' ') }));
+  if (ratingError) strip.append(el('p', { class: 'form-error', role: 'alert', text: ratingError }));
+}
+
 function renderBoard() {
   const board = $('#goalBoard');
   board.replaceChildren();
   const onBoard = boardGoals(goals);
   if (onBoard.length === 0) {
-    board.append(el('p', { class: 'empty', text: 'No goals yet. Tap "+ Pin a new goal" to put your first one on the board.' }));
+    board.append(el('p', { class: 'empty', text: 'No goals yet.' }));
     return;
   }
-  const shown = visibleGoals(onBoard, activeTags, hideCompleted);
+  const shown = visibleGoals(onBoard, activeTags);
   if (shown.length === 0) {
-    const taggedGoals = onBoard.filter((goal) => matchesTag(goal, activeTags));
-    board.append(el('p', {
-      class: 'empty',
-      text: taggedGoals.length === 0
-        ? 'No goals. Tap "Show all" to reset.'
-        : 'Every goal here is completed. Turn off "Hide completed" to see them.',
-    }));
+    board.append(el('p', { class: 'empty', text: 'No goals. Tap "Show all" to reset.' }));
     return;
   }
   for (const goal of shown) board.append(goalCard(goal));
+  markLongNames();
 }
 
 const FENCER_SVG = '<svg viewBox="0 0 64 44" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -123,11 +205,40 @@ const FENCER_SVG = '<svg viewBox="0 0 64 44" fill="none" stroke="currentColor" s
   + '<path d="M16 15 L20 27 M20 27 L9 40 M20 27 L33 31 L35 41 M18 19 L8 14 M18 19 L36 21"/>'
   + '<path d="M36 21 L62 15" stroke-width="1.6"/></svg>';
 
+// A long goal name shows two lines on its card, so one wordy goal does not make every card in its
+// row tall. A card whose name is cut off gets a "Show more" link beside its tag (and "Show less"
+// once opened), so the link does not make the card any taller.
+function markLongNames() {
+  if ($('#goalsPage').hidden) return;
+  for (const card of document.querySelectorAll('#goalBoard .goal-card')) {
+    card.querySelector('.goal-more')?.remove();
+    const name = card.querySelector('.goal-card-name');
+    const open = openedNames.has(card.dataset.goal);
+    card.classList.remove('expanded');
+    const cutOff = name.scrollHeight > name.clientHeight + 1;
+    if (!cutOff && !open) continue;
+    card.classList.toggle('expanded', open);
+    const more = el('button', {
+      class: 'link-btn small goal-more',
+      type: 'button',
+      text: open ? 'Show less' : 'Show more',
+      'aria-expanded': String(open),
+      onclick: () => {
+        if (open) openedNames.delete(card.dataset.goal);
+        else openedNames.add(card.dataset.goal);
+        markLongNames();
+      },
+    });
+    card.querySelector('.goal-card-top').append(more);
+  }
+}
+window.addEventListener('resize', markLongNames);
+
 function goalCard(goal) {
   const due = dueText(goal);
   const card = el('article', { class: 'goal-card goal-tag-' + goal.tag + (goal.progress >= 100 ? ' complete' : ''), 'data-goal': goal.id },
-    el('span', { class: 'goal-card-tag', text: TAGS[goal.tag].label }),
-    el('h3', { class: 'goal-card-name', text: goal.name }),
+    el('div', { class: 'goal-card-top' }, el('span', { class: 'goal-card-tag', text: TAGS[goal.tag].label })),
+    el('h3', { class: 'goal-card-name', title: goal.name, text: goal.name }),
     el('div', { class: 'goal-card-due' }, due.lead, el('span', { class: due.urgent ? 'urgent' : '', text: due.tail })));
 
   const steps = el('div', { class: 'progress-steps', role: 'group', 'aria-label': 'Progress for ' + goal.name });
@@ -234,12 +345,16 @@ function cardActions(goal) {
         },
       }));
   }
-  const archiveButtons = canArchive(goal)
-    ? [el('button', { class: 'btn ghost small', type: 'button', text: 'Archive', 'aria-label': 'Archive ' + goal.name, onclick: () => archiveGoal(goal) })]
-    : [];
+  const edit = el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', 'aria-label': 'Edit ' + goal.name, onclick: () => openGoalForm(goal) });
+  // A finished goal gets Archive in place of Delete, so its card keeps the same two buttons (and
+  // the same height). It can still be deleted for good from the Archive.
+  if (canArchive(goal)) {
+    return el('div', { class: 'goal-card-actions' },
+      el('button', { class: 'btn ghost small', type: 'button', text: 'Archive', 'aria-label': 'Archive ' + goal.name, onclick: () => archiveGoal(goal) }),
+      edit);
+  }
   return el('div', { class: 'goal-card-actions' },
-    ...archiveButtons,
-    el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', 'aria-label': 'Edit ' + goal.name, onclick: () => openGoalForm(goal) }),
+    edit,
     el('button', {
       class: 'btn danger small',
       type: 'button',
@@ -381,16 +496,12 @@ function applyCardSize() {
       cardSize = name;
       saveJson('goalCardSize', cardSize);
       applyCardSize();
+      // The cards changed width, so different names are now cut off.
+      markLongNames();
     },
   })), '[aria-pressed="true"]');
 }
 applyCardSize();
-
-$('#hideCompleted').addEventListener('change', (event) => {
-  hideCompleted = event.target.checked;
-  saveJson('goalsHideCompleted', hideCompleted);
-  renderGoals();
-});
 
 $('#goalForm').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -398,6 +509,11 @@ $('#goalForm').addEventListener('submit', (event) => {
   const problem = validateGoal(fields);
   if (problem) {
     $('#goalFormError').textContent = problem;
+    return;
+  }
+  const existingRatingGoal = ratingGoalConflict(boardGoals(goals), fields.name, editingGoalId);
+  if (existingRatingGoal) {
+    $('#goalFormError').textContent = ratingConflictMessage(existingRatingGoal);
     return;
   }
   if (editingGoalId) Object.assign(goals.find((goal) => goal.id === editingGoalId), fields);
