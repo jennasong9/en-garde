@@ -38,7 +38,7 @@ import { renderFocusStrip } from './focus-strip.js';
 import { planAsSheet, planAsText, planDays } from './mealexport.js';
 import { DEFAULT_REMINDERS, dueMeals, mealReminderText, normalizeReminders, normalizeSent, waterDue, waterReminderText } from './reminders.js';
 import { crc32, sheetToXlsx, zipStored } from './xlsx.js';
-import { entryParts, latestFocus, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
+import { entriesOn, entryForSession, entryParts, freeSlots, latestFocus, matchesFeeling, normalizeEntries, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import {
   addTemplateToDays,
   addToHistory,
@@ -457,7 +457,39 @@ test('latestFocus is the next-session focus of the most recent entry that has on
     '2026-10-01': { feeling: 'sharp', focus: 'Old focus' },
     '2026-10-05': { feeling: 'tired', focus: '  Relax my arm ' },
     '2026-10-09': { feeling: 'steady', text: 'No focus written' },
-  }), { date: '2026-10-05', focus: 'Relax my arm' });
+  }), { id: '2026-10-05', date: '2026-10-05', focus: 'Relax my arm' });
+});
+
+test('several entries on one day: the later written one has the latest focus', () => {
+  const found = latestFocus({
+    a: { id: 'a', date: '2026-10-05', feeling: 'tired', focus: 'Morning focus', createdAt: '2026-10-05T09:00:00Z' },
+    b: { id: 'b', date: '2026-10-05', feeling: 'sharp', focus: 'Evening focus', createdAt: '2026-10-05T20:00:00Z' },
+  });
+  equal(found, { id: 'b', date: '2026-10-05', focus: 'Evening focus' });
+});
+
+test('normalizeEntries gives older date-keyed entries an id and a date, and drops what is not an entry', () => {
+  const clean = normalizeEntries({ '2026-10-05': { feeling: 'sharp' }, x1: { id: 'x1', date: '2026-10-06', feeling: 'tired' }, bad: 'oops' });
+  equal(clean['2026-10-05'], { feeling: 'sharp', id: '2026-10-05', date: '2026-10-05' });
+  equal(clean.x1.date, '2026-10-06');
+  equal(clean.bad, undefined);
+  equal(normalizeEntries(null), {});
+});
+
+test('a day can hold one entry for each session plus one general entry', () => {
+  const entries = {
+    a: { id: 'a', date: '2026-10-05', sessionId: 's1', feeling: 'sharp', createdAt: '2026-10-05T10:00:00Z' },
+    b: { id: 'b', date: '2026-10-05', sessionId: '', feeling: 'tired', createdAt: '2026-10-05T09:00:00Z' },
+    c: { id: 'c', date: '2026-10-06', sessionId: 's9', feeling: 'steady', createdAt: '2026-10-06T10:00:00Z' },
+  };
+  equal(entriesOn(entries, '2026-10-05').map((entry) => entry.id), ['b', 'a']);
+  equal(entryForSession(entries, '2026-10-05', 's1').id, 'a');
+  equal(entryForSession(entries, '2026-10-05', '').id, 'b');
+  equal(entryForSession(entries, '2026-10-05', 's2'), null);
+  const sessions = [{ id: 's1' }, { id: 's2' }];
+  equal(freeSlots(entries, '2026-10-05', sessions), { sessions: [{ id: 's2' }], general: false });
+  equal(freeSlots(entries, '2026-10-05', sessions, 'a'), { sessions: [{ id: 's1' }, { id: 's2' }], general: false });
+  equal(freeSlots(entries, '2026-10-07', sessions), { sessions, general: true });
 });
 
 test('the focus strip shows the latest focus, hides when there is none, and has an Open Journal button only when asked', () => {

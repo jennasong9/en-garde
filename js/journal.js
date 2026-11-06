@@ -1,5 +1,8 @@
 // Pure journal logic: no DOM, no storage, so it can be tested on its own.
-// Entries are kept in an object keyed by date (YYYY-MM-DD), so a day holds at most one.
+// Entries are kept in an object keyed by id. Each has a `date` (YYYY-MM-DD) and the session it is
+// about (`sessionId`, empty for a general entry about the day). A day holds one entry for each of
+// its sessions, plus one general entry. (Entries saved before this were keyed by their date, which
+// is why a date works as an id.)
 
 export const FEELINGS = {
   sharp: { label: 'Sharp', icon: '⚡' },
@@ -10,9 +13,9 @@ export const FEELINGS = {
 
 // The short answers in an entry, then its free notes (kept in `text`, as older entries have it).
 export const SHORT_FIELDS = [
-  { key: 'wentWell', label: 'What went well', placeholder: 'e.g. Clean lunges and good distance' },
-  { key: 'workOn', label: 'What to work on', placeholder: 'e.g. Timing on the parry-riposte' },
-  { key: 'focus', label: 'Next session focus', placeholder: 'e.g. Keep my arm relaxed' },
+  { key: 'wentWell', label: 'What went well' },
+  { key: 'workOn', label: 'What to work on' },
+  { key: 'focus', label: 'Next session focus' },
 ];
 export const NOTES_LABEL = 'Notes';
 
@@ -39,12 +42,50 @@ export function entryParts(entry) {
   return parts.filter((part) => part.text !== '');
 }
 
-// The "next session focus" from the most recent entry (by day) that has one, or null.
+// The saved entries as { id: entry }, each with its id and date filled in (older entries were
+// keyed by their date and had no id), and anything that is not an entry left out.
+export function normalizeEntries(saved) {
+  const result = {};
+  if (saved === null || typeof saved !== 'object' || Array.isArray(saved)) return result;
+  for (const [id, entry] of Object.entries(saved)) {
+    if (entry === null || typeof entry !== 'object') continue;
+    result[id] = { ...entry, id, date: entry.date || id };
+  }
+  return result;
+}
+
+// The entries as a list, each with its id and date.
+const asList = (entries) => Object.entries(entries).map(([id, entry]) => ({ ...entry, id, date: entry.date ?? id }));
+
+// One day's entries, in the order they were written.
+export function entriesOn(entries, iso) {
+  return asList(entries).filter((entry) => entry.date === iso)
+    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '') || (a.id < b.id ? -1 : 1));
+}
+
+// The entry for one session on a day (`sessionId` empty for the day's general entry), or null.
+export function entryForSession(entries, iso, sessionId) {
+  return entriesOn(entries, iso).find((entry) => (entry.sessionId || '') === (sessionId || '')) ?? null;
+}
+
+// What a new entry on a day can be about: the day's sessions that have no entry yet, and whether
+// the general entry is still free. `editingId` is the entry being changed (its own place counts as free).
+export function freeSlots(entries, iso, sessions, editingId = null) {
+  const taken = new Set(entriesOn(entries, iso).filter((entry) => entry.id !== editingId).map((entry) => entry.sessionId || ''));
+  return {
+    sessions: sessions.filter((session) => !taken.has(session.id)),
+    general: !taken.has(''),
+  };
+}
+
+// The "next session focus" from the most recent entry (latest day, then latest written) that has
+// one, or null.
 export function latestFocus(entries) {
-  const dates = Object.keys(entries).filter((date) => answerOf(entries[date], 'focus') !== '').sort();
-  if (dates.length === 0) return null;
-  const date = dates[dates.length - 1];
-  return { date, focus: answerOf(entries[date], 'focus') };
+  const withFocus = asList(entries).filter((entry) => answerOf(entry, 'focus') !== '')
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || '').localeCompare(b.createdAt || ''));
+  if (withFocus.length === 0) return null;
+  const latest = withFocus[withFocus.length - 1];
+  return { id: latest.id, date: latest.date, focus: answerOf(latest, 'focus') };
 }
 
 // An empty filter set means "show every feeling".
@@ -69,18 +110,19 @@ function editedTime(entry) {
 export function sortEntries(entries, sort, activeFeelings = new Set()) {
   const { by = 'created', order = 'desc', custom = [] } = sort;
   const list = Object.entries(entries)
-    .map(([date, entry]) => ({ date, ...entry }))
+    .map(([id, entry]) => ({ ...entry, id, date: entry.date ?? id }))
     .filter((entry) => matchesFeeling(entry, activeFeelings));
   const byTime = (timeOf, direction) => (a, b) => {
     const first = timeOf(a);
     const second = timeOf(b);
     if (first !== second) return (first < second ? -1 : 1) * direction;
-    return (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) * direction;
+    const byDay = a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    return (byDay || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) * direction;
   };
   if (by !== 'custom') return list.sort(byTime(by === 'edited' ? editedTime : createdTime, order === 'asc' ? 1 : -1));
-  const position = new Map(custom.map((date, index) => [date, index]));
-  const unlisted = list.filter((entry) => !position.has(entry.date)).sort(byTime(createdTime, -1));
-  const listed = list.filter((entry) => position.has(entry.date)).sort((a, b) => position.get(a.date) - position.get(b.date));
+  const position = new Map(custom.map((id, index) => [id, index]));
+  const unlisted = list.filter((entry) => !position.has(entry.id)).sort(byTime(createdTime, -1));
+  const listed = list.filter((entry) => position.has(entry.id)).sort((a, b) => position.get(a.id) - position.get(b.id));
   return [...unlisted, ...listed];
 }
 

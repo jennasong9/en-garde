@@ -5,7 +5,7 @@ import { formatTime } from './schedule.js';
 // The ways to export: the name shown, the file ending (none for printing) and what it is for.
 export const EXPORT_FORMATS = {
   text: { label: 'Text file', note: 'Easy to read, or to send to a coach.', extension: 'txt' },
-  excel: { label: 'Spreadsheet (Excel)', note: 'Opens in Excel, Google Sheets or Numbers, with bold headings.', extension: 'xlsx' },
+  excel: { label: 'Spreadsheet', note: 'Opens in Excel, Google Sheets or Numbers.', extension: 'xlsx' },
   print: { label: 'Print or save as PDF', note: 'Opens your browser\'s print window.', extension: '' },
 };
 

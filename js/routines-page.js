@@ -21,6 +21,7 @@ import { loadJson, saveJson } from './storage.js';
 import { checkVideoFile, parseYouTubeLink, videoLabel, youtubeEmbedUrl, youtubeWatchUrl } from './stepvideo.js';
 import { deleteVideo, loadVideo, saveVideo } from './videostore.js';
 import { buildMenu } from './menu.js';
+import { hasReflection, writeReflection } from './journal-page.js';
 import { showToast } from './toast.js';
 import {
   cleanSavedRoutines,
@@ -177,12 +178,24 @@ function sessionSection(session) {
         'aria-label': 'Add a step to this ' + info.short + ' session',
         onclick: () => openForm(session.id, null),
       }),
+      reflectionButton(session),
       buildMenu('btn ghost small', 'Saved ' + info.short + ' routines', ['Saved routines ', el('span', { class: 'chevron', 'aria-hidden': 'true' })], [
         { text: 'Save these steps as a routine', onclick: () => openSaveRoutine(session) },
         { text: 'Load a saved routine', onclick: () => openLoadRoutine(session) },
       ])));
   }
   return section;
+}
+
+// "Write reflection" (or "View reflection" once there is one) for a session: opens its Journal
+// entry in a pop-up, without leaving this page.
+function reflectionButton(session) {
+  return el('button', {
+    class: 'btn ghost small',
+    type: 'button',
+    text: hasReflection(session) ? 'View reflection' : 'Write reflection',
+    onclick: () => writeReflection(session),
+  });
 }
 
 // Rest and Tournament are on the Schedule but have no steps to do: just the session itself.
@@ -194,7 +207,8 @@ function noStepsSection(session) {
     el('h3', { text: info.short }),
     el('span', { class: 'routine-section-meta', text: meta }));
   if (session.done) head.append(el('span', { class: 'routine-done-tag', text: 'Done on the Schedule' }));
-  return el('section', { class: 'routine-section type-' + session.type, 'aria-label': info.short + ' session', 'data-session': session.id }, head);
+  return el('section', { class: 'routine-section type-' + session.type, 'aria-label': info.short + ' session', 'data-session': session.id },
+    head, el('div', { class: 'routine-section-actions' }, reflectionButton(session)));
 }
 
 function stepRow(session, step, index, isDone) {
@@ -284,8 +298,8 @@ function videoField(choice, linkBox) {
 // The little form for adding a step (index -1) or changing one.
 function stepForm(session, index, step) {
   const sessionId = session.id;
-  const name = el('input', { type: 'text', maxlength: '100', placeholder: 'e.g. Pulse raise', value: step.name, 'aria-label': 'Step name' });
-  const desc = el('input', { type: 'text', maxlength: '200', placeholder: 'e.g. 3 min light jogging (optional)', value: step.desc, 'aria-label': 'Step description' });
+  const name = el('input', { type: 'text', maxlength: '100', value: step.name, 'aria-label': 'Step name' });
+  const desc = el('input', { type: 'text', maxlength: '200', value: step.desc, 'aria-label': 'Step description' });
   const link = el('input', { type: 'text', inputmode: 'url', autocomplete: 'off', spellcheck: 'false', placeholder: 'Paste a YouTube link', 'aria-label': 'YouTube link' });
   const choice = { current: step.video ?? null };
   const error = el('p', { class: 'form-error', role: 'alert', text: formError });

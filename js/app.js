@@ -15,7 +15,7 @@ import { renderHydration } from './hydration.js';
 import { renderTodayTray } from './today-tray.js';
 import { renderRoutines, setSessionStepsDone, showRoutinesDay } from './routines-page.js';
 import { SECTION_TYPES } from './sessionsteps.js';
-import { renderJournal, viewEntry } from './journal-page.js';
+import { hasReflection, renderJournal, viewEntry, writeReflection } from './journal-page.js';
 import { renderNutrition } from './nutrition.js';
 import { loadJson, saveJson } from './storage.js';
 import { initProfileMenu, rememberProfile } from './profile-menu.js';
@@ -741,6 +741,15 @@ function sessionCard(session) {
     ...(SECTION_TYPES.includes(session.type)
       ? [el('button', { class: 'btn ghost small', type: 'button', text: 'Open routine', onclick: () => openRoutine(session) })]
       : []),
+    el('button', {
+      class: 'btn ghost small',
+      type: 'button',
+      text: hasReflection(session) ? 'View reflection' : 'Write reflection',
+      onclick: () => {
+        dayDialog.close();
+        writeReflection(session);
+      },
+    }),
     el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', onclick: () => openForm(session) }),
     el('button', {
       class: 'btn danger small',
@@ -1161,9 +1170,9 @@ const PAGES = ['schedule', 'routines', 'nutrition', 'journal', 'goals'];
 
 // The "Open Journal" button on the Routines page's focus strip: goes to the Journal and says so,
 // with a way back, since the page changes under the user.
-function openJournal(date) {
+function openJournal(entryId) {
   location.hash = '#journal';
-  const opened = viewEntry(date);
+  const opened = viewEntry(entryId);
   showToast(opened ? 'Opened your Journal entry.' : 'Opened your Journal.', {
     actionLabel: 'Go back',
     onAction: () => {
@@ -1206,6 +1215,10 @@ function showPage() {
   }
 }
 window.addEventListener('hashchange', showPage);
+// A Journal entry was saved or deleted: redraw the Routines page, which shows the focus and a reflection button.
+document.addEventListener('journal-changed', () => {
+  if (location.hash === '#routines') showPage();
+});
 // The Routines screen and the Today box ask for a session's Done box to change. From the Today box
 // (`syncSteps`) the session's Routines steps follow it; from Routines the steps already did.
 document.addEventListener('session-done-change', (event) => {

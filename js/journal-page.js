@@ -3,17 +3,32 @@ import { showDialog } from './dialog-motion.js';
 import { renderFocusStrip } from './focus-strip.js';
 import { pingToday } from './today-ping.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
-import { FEELINGS, SHORT_FIELDS, SORT_OPTIONS, entryParts, matchesFeeling, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
-import { SESSION_TYPES, formatTime, parseIso, sessionsOn, shiftAnchor, toIso } from './schedule.js';
+import {
+  FEELINGS,
+  SHORT_FIELDS,
+  SORT_OPTIONS,
+  entriesOn,
+  entryForSession,
+  entryParts,
+  freeSlots,
+  matchesFeeling,
+  normalizeEntries,
+  placeInCustomOrder,
+  sortEntries,
+  validateEntry,
+} from './journal.js';
+import { SESSION_TYPES, formatTime, makeId, parseIso, sessionsOn, shiftAnchor, toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
 import { createVideoReview } from './video-review-ui.js';
 import { deleteVideo } from './videostore.js';
 
-const stored = loadJson('journal', {});
-let entries = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+// Entries are kept by id. A day has one entry for each of its sessions plus one general entry.
+// (Entries from before that were kept by their date and get an id here.)
+let entries = normalizeEntries(loadJson('journal', {}));
+saveJson('journal', entries);
 
 let view = 'calendar';
-// How the List view is ordered, and (for "Custom") the user's own order of the entry dates.
+// How the List view is ordered, and (for "Custom") the user's own order of the entries (their ids).
 const storedSort = loadJson('journalSort', {});
 const sort = {
   by: SORT_OPTIONS.includes(storedSort.by) ? storedSort.by : 'created',
@@ -25,12 +40,15 @@ let anchorIso = toIso(new Date());
 const activeFeelings = new Set();
 
 const journalDialog = $('#journalDialog');
+let dialogId = null;
 let dialogDate = null;
 let selectedFeeling = '';
 let confirmingDelete = false;
 
 function persist() {
   saveJson('journal', entries);
+  // Other pages that show entries (the focus strip, the session buttons) can redraw.
+  document.dispatchEvent(new CustomEvent('journal-changed'));
 }
 
 // The sessions on the Schedule, so an entry can say which one it is about.
@@ -52,6 +70,8 @@ function longDate(iso, withYear = false) {
   });
 }
 
+const HINT = 'One entry for each session, plus one general entry a day.';
+
 export function renderJournal() {
   renderViewSwitch();
   renderFeelingFilters();
@@ -63,16 +83,15 @@ export function renderJournal() {
   $('#sortOrder').value = sort.order;
   $('#sortOrderField').hidden = sort.by === 'custom';
   $('#sortHint').hidden = sort.by !== 'custom';
-  // There is one entry per day, so the button says whether it starts today's entry or reopens it.
-  $('#journalAdd').textContent = entries[toIso(new Date())] ? "Edit today's entry" : "+ Write today's entry";
+  $('#journalAdd').textContent = "+ Write today's entry";
   renderFocusStrip($('#journalFocus'), entries);
   if (view === 'calendar') {
     $('#journalTitle').textContent = parseIso(anchorIso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-    $('#journalHint').textContent = 'One entry per day.';
+    $('#journalHint').textContent = HINT;
     renderCalendar();
   } else {
     $('#journalTitle').textContent = 'All entries';
-    $('#journalHint').textContent = 'One entry per day.';
+    $('#journalHint').textContent = HINT;
     renderList();
   }
 }
@@ -126,6 +145,14 @@ function renderFeelingFilters() {
 }
 
 // ---------- calendar view ----------
+const MAX_CELL_CHIPS = 2;
+
+// The short name of the session an entry is about ("Footwork"), or '' for a general entry.
+function sessionShortName(entry) {
+  const session = savedSessions().find((other) => other.id === entry.sessionId);
+  return session && SESSION_TYPES[session.type] ? SESSION_TYPES[session.type].short : '';
+}
+
 function renderCalendar() {
   const anchor = parseIso(anchorIso);
   const year = anchor.getFullYear();
@@ -139,22 +166,28 @@ function renderCalendar() {
   for (let i = 0; i < cellCount; i++) {
     const day = new Date(year, month, 1 - offset + i);
     const iso = toIso(day);
-    const entry = entries[iso];
-    const shown = entry && matchesFeeling(entry, activeFeelings);
+    const dayEntries = entriesOn(entries, iso);
+    const shown = dayEntries.filter((entry) => matchesFeeling(entry, activeFeelings));
     const classes = ['cal-cell'];
     if (day.getMonth() !== month) classes.push('outside');
     if (iso === todayIso) classes.push('today');
 
-    const label = longDate(iso) + ', ' + (shown ? FEELINGS[entry.feeling].label + ' entry' : 'no entry');
+    const label = longDate(iso) + ', ' + (shown.length === 0 ? 'no entry' : shown.length + (shown.length === 1 ? ' entry' : ' entries'));
     const cell = el('button', { class: classes.join(' '), type: 'button', 'aria-label': label, 'data-date': iso },
       el('span', { class: 'cal-date', text: String(day.getDate()) }));
-    if (shown) {
+    for (const entry of shown.slice(0, MAX_CELL_CHIPS)) {
       const { icon, label: feelingLabel } = FEELINGS[entry.feeling];
       cell.append(el('span', { class: 'chip feeling-' + entry.feeling },
-        el('span', { class: 'chip-text', text: icon + ' ' + feelingLabel })));
+        el('span', { class: 'chip-text', text: icon + ' ' + (sessionShortName(entry) || feelingLabel) })));
     }
-    // A day with an entry opens it for reading (Edit is in that pop-up); an empty day starts a new one.
-    cell.addEventListener('click', () => (entry ? openEntryView(iso, cell) : openEntry(iso, cell)));
+    if (shown.length > MAX_CELL_CHIPS) cell.append(el('span', { class: 'cal-more', text: '+' + (shown.length - MAX_CELL_CHIPS) + ' more' }));
+    // A day with one entry opens it for reading (Edit is in that pop-up); a day with several lists
+    // them; an empty day starts a new one.
+    cell.addEventListener('click', () => {
+      if (dayEntries.length === 0) startEntry(iso, '', cell);
+      else if (dayEntries.length === 1) openEntryView(dayEntries[0].id, cell);
+      else openDayList(iso, cell);
+    });
     cells.push(cell);
   }
   $('#journalGrid').replaceChildren(...cells);
@@ -190,7 +223,7 @@ function entryCard(entry) {
   const head = el('div', { class: 'journal-entry-head' },
     el('span', { class: 'journal-entry-date', text: longDate(entry.date, true) }),
     el('span', { class: 'journal-entry-feeling', text: icon + ' ' + label }));
-  const card = el('article', { class: 'journal-entry feeling-' + entry.feeling, 'data-date': entry.date }, head);
+  const card = el('article', { class: 'journal-entry feeling-' + entry.feeling, 'data-id': entry.id }, head);
   const times = writtenText(entry);
   if (times) card.append(el('p', { class: 'journal-entry-times', text: times }));
   if (entry.sessionLabel) card.append(el('p', { class: 'journal-entry-session', text: entry.sessionLabel }));
@@ -208,10 +241,10 @@ function entryCard(entry) {
         type: 'button',
         text: 'Open entry',
         'aria-haspopup': 'dialog',
-        onclick: () => openEntryView(entry.date),
+        onclick: () => openEntryView(entry.id),
       }),
-      el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', onclick: () => openEntry(entry.date) })));
-  if (sort.by === 'custom') head.prepend(reorderHandle(card, entry.date));
+      el('button', { class: 'btn ghost small', type: 'button', text: 'Edit', onclick: () => openEntryForm({ id: entry.id }) })));
+  if (sort.by === 'custom') head.prepend(reorderHandle(card, entry));
   return card;
 }
 
@@ -226,13 +259,14 @@ function writtenText(entry) {
 }
 
 // ---------- arranging entries by hand (the "Custom" sort) ----------
-function reorderHandle(card, date) {
+function reorderHandle(card, entry) {
+  const id = entry.id;
   const handle = el('button', {
     class: 'entry-handle',
     type: 'button',
     text: '⠿',
     title: 'Drag to move this entry',
-    'aria-label': 'Move the entry for ' + longDate(date, true) + '. Drag, or press the up and down arrow keys.',
+    'aria-label': 'Move the entry for ' + longDate(entry.date, true) + (entry.sessionLabel ? ' (' + entry.sessionLabel + ')' : '') + '. Drag, or press the up and down arrow keys.',
   });
   let ghost = null;
   let line = null;
@@ -269,28 +303,28 @@ function reorderHandle(card, date) {
     drop: (event) => {
       const index = insertionIndex(event.clientY);
       cleanup();
-      moveEntry(date, index);
+      moveEntry(id, index);
     },
     cancel: cleanup,
   });
   handle.addEventListener('keydown', (event) => {
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
-    const shown = currentList().map((entry) => entry.date);
-    const next = shown.indexOf(date) + (event.key === 'ArrowUp' ? -1 : 1);
+    const shown = currentList().map((other) => other.id);
+    const next = shown.indexOf(id) + (event.key === 'ArrowUp' ? -1 : 1);
     if (next >= 0 && next < shown.length) {
-      moveEntry(date, next);
-      $('#journalList').querySelector('[data-date="' + date + '"] .entry-handle')?.focus();
+      moveEntry(id, next);
+      $('#journalList').querySelector('[data-id="' + id + '"] .entry-handle')?.focus();
     }
   });
   return handle;
 }
 
 // Puts an entry at a position among the entries showing, and remembers the whole order.
-function moveEntry(date, index) {
-  const everything = sortEntries(entries, { ...sort, custom: customOrder }).map((entry) => entry.date);
-  const showing = currentList().map((entry) => entry.date);
-  customOrder = placeInCustomOrder(everything, showing, date, index);
+function moveEntry(id, index) {
+  const everything = sortEntries(entries, { ...sort, custom: customOrder }).map((entry) => entry.id);
+  const showing = currentList().map((entry) => entry.id);
+  customOrder = placeInCustomOrder(everything, showing, id, index);
   saveJson('journalOrder', customOrder);
   renderJournal();
 }
@@ -308,13 +342,13 @@ $('#sortOrder').addEventListener('change', (event) => {
 
 // ---------- read an entry in a pop-up ----------
 const entryViewDialog = $('#entryViewDialog');
-let viewedDate = null;
+let viewedId = null;
 
-function openEntryView(iso, origin = null) {
-  const entry = entries[iso];
-  viewedDate = iso;
+function openEntryView(id, origin = null) {
+  const entry = entries[id];
+  viewedId = id;
   const { icon, label } = FEELINGS[entry.feeling];
-  $('#entryViewTitle').textContent = longDate(iso, true);
+  $('#entryViewTitle').textContent = longDate(entry.date, true);
   $('#entryViewFeeling').textContent = icon + ' ' + label;
   $('#entryViewFeeling').className = 'journal-entry-feeling feeling-' + entry.feeling;
   $('#entryViewSession').hidden = !entry.sessionLabel;
@@ -328,16 +362,27 @@ function openEntryView(iso, origin = null) {
 }
 
 // Opens one entry for reading (used by the focus strip's "Open Journal" button). Returns false when
-// there is no entry for that day.
-export function viewEntry(iso) {
-  if (!entries[iso]) return false;
-  openEntryView(iso);
+// there is no such entry.
+export function viewEntry(id) {
+  if (!entries[id]) return false;
+  openEntryView(id);
   return true;
+}
+
+// A session's reflection: the button on a session reads "View reflection" when one exists.
+export const hasReflection = (session) => entryForSession(entries, session.date, session.id) !== null;
+
+// The "Write reflection" button on a session: opens that session's entry for reading, or a new
+// entry about that session.
+export function writeReflection(session) {
+  const existing = entryForSession(entries, session.date, session.id);
+  if (existing) openEntryView(existing.id);
+  else startEntry(session.date, session.id);
 }
 
 $('#entryViewEdit').addEventListener('click', () => {
   entryViewDialog.close();
-  openEntry(viewedDate);
+  openEntryForm({ id: viewedId });
 });
 entryViewDialog.addEventListener('close', () => videoViewer.stop());
 $('#entryViewDone').addEventListener('click', () => entryViewDialog.close());
@@ -359,20 +404,29 @@ function renderFeelingPicker() {
 
 $('#shortFields').replaceChildren(...SHORT_FIELDS.map((field) => el('label', { class: 'field short-field' },
   field.label,
-  el('textarea', { id: 'j-' + field.key, rows: '2', maxlength: '300', placeholder: field.placeholder }))));
+  el('textarea', { id: 'j-' + field.key, rows: '2', maxlength: '300' }))));
 
-// The choices for "Which session was it?": the sessions on that day's Schedule, and the one this
-// entry was saved with if it has since been removed.
-function fillSessionChoices(iso, entry) {
+// The choices for "Which session was it?": the day's sessions that have no entry yet, the day's
+// general entry if it is still free, and the session this entry was saved with if it has since
+// been removed from the Schedule. A new entry starts on `preferred` (the session it was started
+// from), or on the only free session, or on the general choice.
+function fillSessionChoices(iso, entry, preferred) {
   const sessions = sessionsOn(savedSessions(), iso).filter((session) => SESSION_TYPES[session.type]);
-  const choices = [el('option', { value: '', text: sessions.length === 0 ? 'No sessions on the Schedule this day' : 'Not about a particular session' })];
-  for (const session of sessions) choices.push(el('option', { value: session.id, text: sessionLabel(session) }));
-  const removed = entry && entry.sessionId && !sessions.some((session) => session.id === entry.sessionId);
-  if (removed) choices.push(el('option', { value: entry.sessionId, text: entry.sessionLabel + ' (removed from the Schedule)' }));
+  const free = freeSlots(entries, iso, sessions, entry ? entry.id : null);
+  const choices = [];
+  if (free.general) choices.push(el('option', { value: '', text: 'Not about a particular session' }));
+  for (const session of free.sessions) choices.push(el('option', { value: session.id, text: sessionLabel(session) }));
+  if (entry && entry.sessionId && !sessions.some((session) => session.id === entry.sessionId)) {
+    choices.push(el('option', { value: entry.sessionId, text: entry.sessionLabel + ' (removed from the Schedule)' }));
+  }
   $('#jSession').replaceChildren(...choices);
-  // A day with exactly one session is that session, unless an entry already says otherwise.
-  $('#jSession').value = entry ? entry.sessionId || '' : sessions.length === 1 ? sessions[0].id : '';
-  $('#jSession').disabled = choices.length === 1 && sessions.length === 0;
+  let chosen = '';
+  if (entry) chosen = entry.sessionId || '';
+  else if (preferred && free.sessions.some((session) => session.id === preferred)) chosen = preferred;
+  else if (free.sessions.length === 1) chosen = free.sessions[0].id;
+  else if (!free.general) chosen = free.sessions[0].id;
+  $('#jSession').value = chosen;
+  $('#jSession').disabled = choices.length <= 1;
 }
 
 const videoViewer = createVideoReview($('#entryViewVideo'), () => {}, { readOnly: true });
@@ -381,16 +435,26 @@ const videoReview = createVideoReview($('#videoReview'), () => {
   $('#jVideoState').value = videoReview.stateText();
 });
 
+// Starts a new entry on a day (about `sessionId`, or a general one when empty). When every place
+// that day already has an entry, shows the day's entries instead.
+function startEntry(iso, sessionId = '', origin = null) {
+  const sessions = sessionsOn(savedSessions(), iso).filter((session) => SESSION_TYPES[session.type]);
+  const free = freeSlots(entries, iso, sessions);
+  if (!free.general && free.sessions.length === 0) openDayList(iso, origin);
+  else openEntryForm({ date: iso, sessionId, origin });
+}
+
 // `origin` is the calendar date the pop-up grows out of, when it was opened from one.
-function openEntry(iso, origin = null) {
-  const entry = entries[iso];
-  dialogDate = iso;
+function openEntryForm({ id = null, date = null, sessionId = '', origin = null }) {
+  const entry = id ? entries[id] : null;
+  dialogId = id;
+  dialogDate = entry ? entry.date : date;
   selectedFeeling = entry ? entry.feeling : '';
   confirmingDelete = false;
-  $('#journalDialogTitle').textContent = (entry ? 'Edit entry — ' : 'New entry — ') + longDate(iso);
+  $('#journalDialogTitle').textContent = (entry ? 'Edit entry — ' : 'New entry — ') + longDate(dialogDate);
   $('#jText').value = entry ? entry.text || '' : '';
   for (const field of SHORT_FIELDS) $('#j-' + field.key).value = entry ? entry[field.key] || '' : '';
-  fillSessionChoices(iso, entry);
+  fillSessionChoices(dialogDate, entry, sessionId);
   $('#journalError').textContent = '';
   const deleteButton = $('#journalDelete');
   deleteButton.hidden = !entry;
@@ -402,6 +466,43 @@ function openEntry(iso, origin = null) {
   journalGuard.reset();
 }
 
+// ---------- a day with several entries ----------
+const dayDialog = $('#journalDayDialog');
+let dayIso = null;
+
+function openDayList(iso, origin = null) {
+  dayIso = iso;
+  $('#journalDayTitle').textContent = longDate(iso, true);
+  renderDayList();
+  showDialog(dayDialog, origin);
+}
+
+function renderDayList() {
+  const sessions = sessionsOn(savedSessions(), dayIso).filter((session) => SESSION_TYPES[session.type]);
+  const free = freeSlots(entries, dayIso, sessions);
+  $('#journalDayAdd').hidden = !free.general && free.sessions.length === 0;
+  $('#journalDayList').replaceChildren(...entriesOn(entries, dayIso).map((entry) => {
+    const { icon, label } = FEELINGS[entry.feeling];
+    return el('li', {}, el('button', {
+      class: 'day-entry feeling-' + entry.feeling,
+      type: 'button',
+      onclick: () => {
+        dayDialog.close();
+        openEntryView(entry.id);
+      },
+    },
+    el('b', { text: entry.sessionLabel || 'General (the whole day)' }),
+    el('span', { text: icon + ' ' + label + (entry.video ? ' · ▶ Video review' : '') })));
+  }));
+}
+
+$('#journalDayAdd').addEventListener('click', () => {
+  dayDialog.close();
+  startEntry(dayIso);
+});
+$('#journalDayClose').addEventListener('click', () => dayDialog.close());
+closeOnBackdropClick(dayDialog);
+
 $('#journalForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const entry = { feeling: selectedFeeling, text: $('#jText').value.trim() };
@@ -411,7 +512,13 @@ $('#journalForm').addEventListener('submit', async (event) => {
     $('#journalError').textContent = problem;
     return;
   }
-  const before = entries[dialogDate];
+  const before = dialogId ? entries[dialogId] : null;
+  const chosen = $('#jSession').value;
+  const taken = entryForSession(entries, dialogDate, chosen);
+  if (taken && taken.id !== dialogId) {
+    $('#journalError').textContent = 'That session already has an entry. Open it from the day, or choose another session.';
+    return;
+  }
   let review;
   try {
     review = await videoReview.collect();
@@ -425,7 +532,6 @@ $('#journalForm').addEventListener('submit', async (event) => {
   entry.videoNotes = review.videoNotes;
   // The chosen session is kept as its id and as a label, so the entry still reads right if the
   // session is later removed from the Schedule.
-  const chosen = $('#jSession').value;
   const session = savedSessions().find((other) => other.id === chosen);
   entry.sessionId = chosen;
   entry.sessionLabel = session && SESSION_TYPES[session.type] ? sessionLabel(session) : chosen && before ? before.sessionLabel : '';
@@ -433,9 +539,10 @@ $('#journalForm').addEventListener('submit', async (event) => {
   const keys = ['feeling', 'text', 'sessionId', ...SHORT_FIELDS.map((field) => field.key)];
   const videoChanged = JSON.stringify([before?.video ?? null, before?.videoNotes ?? []]) !== JSON.stringify([entry.video, entry.videoNotes]);
   if (!before) {
-    entries[dialogDate] = { ...entry, createdAt: now, editedAt: now };
+    const id = makeId();
+    entries[id] = { ...entry, id, date: dialogDate, createdAt: now, editedAt: now };
   } else if (videoChanged || keys.some((key) => (before[key] || '') !== entry[key])) {
-    entries[dialogDate] = { ...before, ...entry, editedAt: now };
+    entries[dialogId] = { ...before, ...entry, editedAt: now };
   }
   persist();
   journalDialog.close();
@@ -449,8 +556,8 @@ $('#journalDelete').addEventListener('click', () => {
     $('#journalDelete').textContent = 'Really delete?';
     return;
   }
-  if (entries[dialogDate]?.video?.kind === 'file') deleteVideo(entries[dialogDate].video.id).catch(() => {});
-  delete entries[dialogDate];
+  if (entries[dialogId]?.video?.kind === 'file') deleteVideo(entries[dialogId].video.id).catch(() => {});
+  delete entries[dialogId];
   persist();
   journalDialog.close();
   renderJournal();
@@ -470,7 +577,7 @@ $('#journalNext').addEventListener('click', () => {
   anchorIso = shiftAnchor('month', anchorIso, 1);
   renderJournal();
 });
-$('#journalAdd').addEventListener('click', () => openEntry(toIso(new Date())));
+$('#journalAdd').addEventListener('click', () => startEntry(toIso(new Date())));
 
 $('#journalToday').addEventListener('click', () => {
   anchorIso = toIso(new Date());

@@ -426,7 +426,7 @@
     </div>
     <form id="goalForm" novalidate>
       <label class="field">Goal
-        <input type="text" id="gName" maxlength="120" placeholder="e.g. Land a clean fl&egrave;che under pressure">
+        <input type="text" id="gName" maxlength="120">
       </label>
       <fieldset class="field">
         <legend>Tag</legend>
@@ -461,6 +461,17 @@
     </div>
   </dialog>
 
+  <dialog id="journalDayDialog" aria-labelledby="journalDayTitle">
+    <div class="dialog-head">
+      <h2 id="journalDayTitle"></h2>
+      <button class="icon-btn" id="journalDayClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <ul class="day-entries" id="journalDayList"></ul>
+    <div class="form-actions">
+      <button class="btn" id="journalDayAdd" type="button">+ Add entry</button>
+    </div>
+  </dialog>
+
   <dialog id="journalDialog" aria-labelledby="journalDialogTitle">
     <div class="dialog-head">
       <h2 id="journalDialogTitle"></h2>
@@ -476,7 +487,7 @@
       </label>
       <div id="shortFields"></div>
       <label class="field">Notes (optional)
-        <textarea id="jText" class="journal-text" maxlength="2000" placeholder="Anything else: pain, energy, food, how a bout went..."></textarea>
+        <textarea id="jText" class="journal-text" maxlength="2000"></textarea>
       </label>
       <div id="videoReview"></div>
       <input type="hidden" id="jVideoState">
@@ -501,7 +512,7 @@
         <select id="mName"></select>
       </label>
       <label class="field">What's in it?
-        <textarea id="mDesc" maxlength="300" placeholder="e.g. Oats with banana and peanut butter"></textarea>
+        <textarea id="mDesc" maxlength="300"></textarea>
       </label>
       <div class="field-row">
         <label class="field">Time
