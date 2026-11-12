@@ -105,10 +105,15 @@ export function stepKey(step) {
   return step.name + '\n' + step.desc;
 }
 
+// Characters that flip the direction of the text around them. They are invisible, so a name
+// that holds one can display backwards or hide what it says.
+export const HIDDEN_DIRECTION_CHARS = /[\u200E\u200F\u202A-\u202E\u2066-\u2069]/;
+
 // Checks what was typed for a step (and its video, if any). Returns { error } or { value: { name, desc, video? } }.
 export function validateStep({ name, desc, video }) {
   const step = { name: name.trim(), desc: desc.trim() };
   if (step.name === '') return { error: 'Give the step a name.' };
+  if (HIDDEN_DIRECTION_CHARS.test(step.name + step.desc)) return { error: 'Remove the hidden text-direction characters.' };
   if (step.name.length > MAX_STEP_NAME_CHARS) return { error: 'Keep the name under ' + MAX_STEP_NAME_CHARS + ' characters.' };
   if (step.desc.length > MAX_STEP_DESC_CHARS) return { error: 'Keep the description under ' + MAX_STEP_DESC_CHARS + ' characters.' };
   if (video) {
@@ -173,6 +178,23 @@ export function doneAfterTick(before, after) {
 // done, none when it was cleared.
 export function ticksForDone(steps, done) {
   return done ? steps.map(stepKey) : [];
+}
+
+// The saved ticks as { sessionId: [step keys] }, keeping only lists of text keys (damaged saved
+// data would otherwise break the page that reads them).
+export function cleanTicks(saved) {
+  if (saved === null || typeof saved !== 'object' || Array.isArray(saved)) return {};
+  return Object.fromEntries(
+    Object.entries(saved)
+      .filter(([, keys]) => Array.isArray(keys))
+      .map(([id, keys]) => [id, keys.filter((key) => typeof key === 'string')]),
+  );
+}
+
+// The ticks after a step was edited: a ticked step stays ticked under its new name and description.
+export function renameTick(doneKeys, oldStep, newStep) {
+  const oldKey = stepKey(oldStep);
+  return doneKeys.map((key) => (key === oldKey ? stepKey(newStep) : key));
 }
 
 // The saved ticks without those of sessions that no longer exist on the Schedule.

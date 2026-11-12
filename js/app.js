@@ -27,6 +27,7 @@ import {
   SESSION_TYPES,
   MOVE_STEP_MINUTES,
   VIEWS,
+  cleanSessions,
   expandRepeat,
   extraRepeatDates,
   findDuplicates,
@@ -54,8 +55,7 @@ const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MAX_CHIPS_PER_DAY = 2;
 
 // ---------- state ----------
-const storedSessions = loadJson('sessions', []);
-let sessions = Array.isArray(storedSessions) ? storedSessions : [];
+let sessions = cleanSessions(loadJson('sessions', []));
 let profile = { ...DEFAULT_PROFILE, ...loadJson('profile', {}) };
 
 // The calendar shows `view` around `anchorIso`. Phones open on the 3-day view because a
@@ -765,7 +765,7 @@ function sessionCard(session) {
 }
 
 function deleteConfirmation(session) {
-  const row = el('div', { class: 'confirm-row' }, el('p', { text: 'Delete this session?' }));
+  const row = el('div', { class: 'confirm-row' }, el('p', { text: 'Delete this session? Its routine steps (and any step videos you uploaded) are deleted too. Its Journal entry is kept.' }));
   row.append(el('button', {
     class: 'btn danger small',
     type: 'button',

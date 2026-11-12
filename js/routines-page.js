@@ -1,16 +1,18 @@
 import { showDialog } from './dialog-motion.js';
 import { burstConfetti } from './confetti.js';
 import { $, closeOnBackdropClick, el, formState, protectUnsavedChanges } from './dom.js';
-import { SESSION_TYPES, formatTime, makeId, parseIso, sessionsOn, shiftAnchor, toIso } from './schedule.js';
+import { SESSION_TYPES, cleanSessions, formatTime, makeId, parseIso, sessionsOn, shiftAnchor, toIso } from './schedule.js';
 import {
   SECTION_TYPES,
   cleanStepsBySession,
+  cleanTicks,
   doneAfterTick,
   finishedSession,
   keepStepsFor,
   keepTicksFor,
   migrateStepsToSessions,
   removeStep,
+  renameTick,
   saveStep,
   sessionProgress,
   stepsDone,
@@ -52,8 +54,7 @@ if (savedBySession === null) {
 }
 
 // Which steps are ticked for each session: { sessionId: [step keys] }.
-const storedTicks = loadJson('sessionTicks', {});
-let ticks = storedTicks !== null && typeof storedTicks === 'object' && !Array.isArray(storedTicks) ? storedTicks : {};
+let ticks = cleanTicks(loadJson('sessionTicks', {}));
 
 // Whether a ticked step gets a line through it (the user can turn this off).
 let strikethrough = loadJson('routineStrikethrough', true) !== false;
@@ -95,8 +96,14 @@ function persistTicks() {
 }
 
 function allSessions() {
-  const saved = loadJson('sessions', []);
-  return Array.isArray(saved) ? saved : [];
+  return cleanSessions(loadJson('sessions', []));
+}
+
+// Asks the Schedule to change a session's Done box when a change to its steps (an added step, a
+// loaded routine) means it is no longer finished. `before` is the progress before the change.
+function syncDone(sessionId, before) {
+  const done = doneAfterTick(before, sessionProgress(stepsOf(sessionId), ticks[sessionId] || []));
+  if (done !== null) document.dispatchEvent(new CustomEvent('session-done-change', { detail: { id: sessionId, done } }));
 }
 
 // Called by the Schedule when a session's Done box is switched: ticks every step of that session
@@ -339,9 +346,16 @@ function stepForm(session, index, step) {
       if (savedNewFile) deleteVideo(savedNewFile).catch(() => {});
       return fail(result.error);
     }
-    const oldVideo = index >= 0 ? stepsOf(sessionId)[index]?.video : null;
-    if (oldVideo?.kind === 'file' && oldVideo.id !== video?.id) deleteVideo(oldVideo.id).catch(() => {});
+    const oldStep = index >= 0 ? stepsOf(sessionId)[index] : null;
+    const before = sessionProgress(stepsOf(sessionId), ticks[sessionId] || []);
+    if (oldStep?.video?.kind === 'file' && oldStep.video.id !== video?.id) deleteVideo(oldStep.video.id).catch(() => {});
     setSteps(sessionId, result.steps);
+    // An edited step that was ticked stays ticked, and Done follows the ticks.
+    if (oldStep) {
+      ticks = { ...ticks, [sessionId]: renameTick(ticks[sessionId] || [], oldStep, result.steps[index]) };
+      persistTicks();
+    }
+    syncDone(sessionId, before);
     closeForm();
   });
   form.addEventListener('keydown', (event) => {
@@ -376,9 +390,14 @@ function removeAt(session, index, alsoFrom = null) {
   setSteps(session.id, removeStep(stepsOf(session.id), index));
   if (alsoFrom) {
     const changed = routineWithoutStep(alsoFrom, step);
-    savedRoutines = { ...savedRoutines, [session.type]: savedRoutines[session.type].map((routine) => (routine.id === changed.id ? changed : routine)) };
+    const emptied = changed.steps.length === 0;
+    // A routine with no steps left would only wipe a session when loaded, so it goes too.
+    savedRoutines = {
+      ...savedRoutines,
+      [session.type]: savedRoutines[session.type].flatMap((routine) => (routine.id !== changed.id ? [routine] : emptied ? [] : [changed])),
+    };
     persistRoutines();
-    showToast('Removed from "' + alsoFrom.name + '" too.');
+    showToast(emptied ? 'Removed. "' + alsoFrom.name + '" had no steps left, so it was deleted.' : 'Removed from "' + alsoFrom.name + '" too.');
   }
   confirmingRemove = null;
   renderRoutines();
@@ -557,12 +576,14 @@ function renderRoutineList() {
 }
 
 function loadRoutine(routine) {
+  const before = sessionProgress(stepsOf(librarySession.id), ticks[librarySession.id] || []);
   for (const step of stepsOf(librarySession.id)) {
     if (step.video?.kind === 'file') deleteVideo(step.video.id).catch(() => {});
   }
   setSteps(librarySession.id, routine.steps.map((step) => ({ ...step })), routine.id);
   ticks = { ...ticks, [librarySession.id]: [] };
   persistTicks();
+  syncDone(librarySession.id, before);
   adding = null;
   editing = null;
   confirmingRemove = null;

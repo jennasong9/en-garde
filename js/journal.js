@@ -4,6 +4,9 @@
 // its sessions, plus one general entry. (Entries saved before this were keyed by their date, which
 // is why a date works as an id.)
 
+import { normalizeVideo } from './stepvideo.js';
+import { cleanVideoNotes } from './video-review.js';
+
 export const FEELINGS = {
   sharp: { label: 'Sharp', icon: '⚡' },
   steady: { label: 'Steady', icon: '●' },
@@ -18,6 +21,11 @@ export const SHORT_FIELDS = [
   { key: 'focus', label: 'Next session focus' },
 ];
 export const NOTES_LABEL = 'Notes';
+
+// How an entry's feeling is shown. An entry with no (or an unknown) feeling, such as damaged
+// saved data, still gets something to show instead of breaking the page.
+const NO_FEELING = { label: 'No feeling', icon: '–' };
+export const feelingOf = (entry) => FEELINGS[entry.feeling] ?? NO_FEELING;
 
 export const MAX_ENTRY_CHARS = 2000;
 export const MAX_SHORT_CHARS = 300;
@@ -49,7 +57,14 @@ export function normalizeEntries(saved) {
   if (saved === null || typeof saved !== 'object' || Array.isArray(saved)) return result;
   for (const [id, entry] of Object.entries(saved)) {
     if (entry === null || typeof entry !== 'object') continue;
-    result[id] = { ...entry, id, date: entry.date || id };
+    result[id] = {
+      ...entry,
+      id,
+      date: entry.date || id,
+      feeling: FEELINGS[entry.feeling] ? entry.feeling : '',
+      video: normalizeVideo(entry.video),
+      videoNotes: cleanVideoNotes(entry.videoNotes),
+    };
   }
   return result;
 }
@@ -94,6 +109,15 @@ export function matchesFeeling(entry, activeFeelings) {
 }
 
 export const SORT_OPTIONS = ['created', 'edited', 'custom'];
+
+// The saved List order setting, with anything damaged replaced by the default (newest first).
+export function normalizeSort(saved) {
+  const valid = saved !== null && typeof saved === 'object';
+  return {
+    by: valid && SORT_OPTIONS.includes(saved.by) ? saved.by : 'created',
+    order: valid && saved.order === 'asc' ? 'asc' : 'desc',
+  };
+}
 
 // When an entry was written or last changed, as a sortable text. Entries saved before the app
 // kept these times use the day they are for.

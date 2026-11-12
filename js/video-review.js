@@ -31,7 +31,7 @@ export function validateVideoNote({ time, text }) {
   if (seconds === null) return { error: 'Type the time like 1:32 (minutes:seconds).' };
   const trimmed = String(text).trim();
   if (trimmed === '') return { error: 'Write what you noticed at that moment.' };
-  if (trimmed.length > MAX_NOTE_CHARS) return { error: 'A note can be up to ' + MAX_NOTE_CHARS + ' characters.' };
+  if (Array.from(trimmed).length > MAX_NOTE_CHARS) return { error: 'A note can be up to ' + MAX_NOTE_CHARS + ' characters.' };
   return { value: { time: seconds, text: trimmed } };
 }
 
@@ -50,7 +50,7 @@ export function cleanVideoNotes(notes) {
   if (!Array.isArray(notes)) return [];
   return notes
     .filter((note) => Number.isInteger(note?.time) && note.time >= 0 && typeof note.text === 'string' && note.text.trim() !== '')
-    .map((note) => ({ time: note.time, text: note.text.slice(0, MAX_NOTE_CHARS) }))
+    .map((note) => ({ time: note.time, text: Array.from(note.text).slice(0, MAX_NOTE_CHARS).join('') }))
     .sort((a, b) => a.time - b.time)
     .slice(0, MAX_VIDEO_NOTES);
 }

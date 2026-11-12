@@ -1,7 +1,7 @@
 // Pure logic for saved routines: no DOM, no storage, so it can be tested on its own. A saved
 // routine is { id, name, savedAt, steps }, a copy of the steps of one session type. Each session
 // type keeps its own list of them, like saved meal plans.
-import { STARTER_STEPS, SECTION_TYPES, cleanSteps, stepKey } from './sessionsteps.js';
+import { HIDDEN_DIRECTION_CHARS, STARTER_STEPS, SECTION_TYPES, cleanSteps, stepKey } from './sessionsteps.js';
 
 export const MAX_SAVED_ROUTINES = 20;
 export const MAX_ROUTINE_NAME_CHARS = 60;
@@ -20,6 +20,7 @@ export function defaultRoutineName(typeName, routines) {
 export function validateRoutineName(name, routines) {
   const trimmed = name.trim();
   if (trimmed === '') return 'Give the routine a name.';
+  if (HIDDEN_DIRECTION_CHARS.test(trimmed)) return 'Remove the hidden text-direction characters.';
   if (trimmed.length > MAX_ROUTINE_NAME_CHARS) return 'Keep the name under ' + MAX_ROUTINE_NAME_CHARS + ' characters.';
   if (routines.some((routine) => routine.name.toLowerCase() === trimmed.toLowerCase())) {
     return 'You already have a routine with that name. Choose a different name.';
@@ -53,6 +54,7 @@ export function cleanSavedRoutines(saved) {
     result[type] = list
       .filter((routine) => typeof routine?.id === 'string' && typeof routine.name === 'string' && routine.name.trim() !== '')
       .map((routine) => ({ id: routine.id, name: routine.name, savedAt: String(routine.savedAt ?? ''), steps: cleanSteps(routine.steps) }))
+      .filter((routine) => routine.steps.length > 0)
       .slice(0, MAX_SAVED_ROUTINES);
   }
   return result;

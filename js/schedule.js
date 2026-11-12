@@ -11,6 +11,13 @@ export const SESSION_TYPES = {
 };
 
 export const MAX_REPEAT_DAYS = 366;
+
+// The saved sessions, without anything that is not a session (damaged saved data would break the
+// Schedule, the Routines page and the Today box).
+export function cleanSessions(saved) {
+  if (!Array.isArray(saved)) return [];
+  return saved.filter((session) => session !== null && typeof session === 'object' && typeof session.id === 'string' && typeof session.date === 'string');
+}
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function pad(n) {

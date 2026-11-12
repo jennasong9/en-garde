@@ -1,6 +1,7 @@
 // The "Video review" part of the Journal entry form: attach a game video (a YouTube link or a
 // file from this device), watch it, and write notes tied to moments in it. Tapping a note jumps
 // the video to that moment.
+import { isStrayClick } from './confirm.js';
 import { el } from './dom.js';
 import { setFolded } from './fold.js';
 import { checkVideoFile, normalizeVideo, parseYouTubeLink, videoLabel } from './stepvideo.js';
@@ -176,7 +177,7 @@ export function createVideoReview(container, onChange, { readOnly = false } = {}
 
   function noteForm() {
     const time = el('input', { type: 'text', class: 'video-note-time-input', inputmode: 'numeric', autocomplete: 'off', placeholder: 'Now', 'aria-label': 'Time in the video (leave empty for where the video is now)' });
-    const text = el('input', { type: 'text', maxlength: '200', placeholder: 'What did you notice?', 'aria-label': 'Note' });
+    const text = el('input', { type: 'text', maxlength: '400', placeholder: 'What did you notice?', 'aria-label': 'Note' });
     const error = el('p', { class: 'form-error', role: 'alert' });
     const add = () => {
       let at = time.value;
@@ -215,6 +216,28 @@ export function createVideoReview(container, onChange, { readOnly = false } = {}
   }
 
   const notesArea = el('div', { class: 'video-notes-area' });
+  // Removing the video also removes the notes written about it, so with notes it takes two presses.
+  function removeVideoButton() {
+    let armedAt = null;
+    const button = el('button', {
+      class: 'btn danger small',
+      type: 'button',
+      text: 'Remove video',
+      onclick: () => {
+        if (notes.length > 0 && armedAt === null) {
+          armedAt = Date.now();
+          button.textContent = 'Remove video and ' + notes.length + (notes.length === 1 ? ' note?' : ' notes?');
+          return;
+        }
+        if (isStrayClick(armedAt, Date.now())) return;
+        choice = null;
+        notes = [];
+        changed();
+      },
+    });
+    return button;
+  }
+
   function renderNotes() {
     notesArea.replaceChildren(noteList());
   }
@@ -236,7 +259,7 @@ export function createVideoReview(container, onChange, { readOnly = false } = {}
       slot,
       el('div', { class: 'video-review-bar' },
         el('span', { class: 'step-video-name', text: '▶ ' + (choice.kind === 'pending' ? choice.file.name : videoLabel(choice)) }),
-        el('button', { class: 'btn danger small', type: 'button', text: 'Remove video', onclick: () => { choice = null; notes = []; changed(); } })),
+        removeVideoButton()),
       noteForm(),
       notesArea);
     renderNotes();

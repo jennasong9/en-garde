@@ -1,4 +1,5 @@
 import { burstConfetti } from './confetti.js';
+import { isStrayClick } from './confirm.js';
 import { showDialog } from './dialog-motion.js';
 import { $, el, formState, protectUnsavedChanges } from './dom.js';
 import { setFolded } from './fold.js';
@@ -33,6 +34,7 @@ let selectedTag = '';
 let confirmingDeleteId = null;
 let confirmingArchivedDeleteId = null;
 let confirmingDeleteInDialog = false;
+let deleteArmedAt = null;
 // Goals whose long name is opened out (a card shows two lines of a name unless opened).
 const openedNames = new Set();
 
@@ -461,6 +463,7 @@ function openGoalForm(goal) {
   editingGoalId = goal ? goal.id : null;
   selectedTag = goal ? goal.tag : '';
   confirmingDeleteInDialog = false;
+  deleteArmedAt = null;
   $('#goalDialogTitle').textContent = goal ? 'Edit goal' : 'Pin a new goal';
   $('#gName').value = goal ? goal.name : '';
   $('#gDue').value = goal ? goal.due : '';
@@ -527,9 +530,11 @@ $('#goalForm').addEventListener('submit', (event) => {
 $('#goalDelete').addEventListener('click', () => {
   if (!confirmingDeleteInDialog) {
     confirmingDeleteInDialog = true;
+    deleteArmedAt = Date.now();
     $('#goalDelete').textContent = 'Really delete?';
     return;
   }
+  if (isStrayClick(deleteArmedAt, Date.now())) return;
   goalDialog.close();
   deleteGoal(editingGoalId);
 });

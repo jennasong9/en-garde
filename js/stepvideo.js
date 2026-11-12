@@ -19,6 +19,7 @@ export function parseYouTubeLink(text) {
   } catch (error) {
     return { error: 'That does not look like a link. It should look like ' + EXAMPLE };
   }
+  if (!url.hostname.includes('.')) return { error: 'That does not look like a link. It should look like ' + EXAMPLE };
   if ((url.protocol !== 'https:' && url.protocol !== 'http:') || !YOUTUBE_HOSTS.includes(url.hostname)) {
     return { error: 'Only YouTube links work here. It should look like ' + EXAMPLE };
   }

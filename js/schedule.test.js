@@ -21,9 +21,11 @@ import {
   cleanStepsBySession,
   keepStepsFor,
   migrateStepsToSessions,
+  cleanTicks,
   doneAfterTick,
   finishedSession,
   keepTicksFor,
+  renameTick,
   removeStep,
   saveStep,
   sessionProgress,
@@ -38,7 +40,8 @@ import { renderFocusStrip } from './focus-strip.js';
 import { planAsSheet, planAsText, planDays } from './mealexport.js';
 import { DEFAULT_REMINDERS, dueMeals, mealReminderText, normalizeReminders, normalizeSent, waterDue, waterReminderText } from './reminders.js';
 import { crc32, sheetToXlsx, zipStored } from './xlsx.js';
-import { entriesOn, entryForSession, entryParts, freeSlots, latestFocus, matchesFeeling, normalizeEntries, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
+import { entriesOn, entryForSession, entryParts, feelingOf, freeSlots, latestFocus, matchesFeeling, normalizeEntries, normalizeSort, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
+import { isStrayClick } from './confirm.js';
 import {
   addTemplateToDays,
   addToHistory,
@@ -71,6 +74,7 @@ import {
   upcomingMeals,
 } from './meals.js';
 import {
+  cleanSessions,
   expandRepeat,
   extraRepeatDates,
   findDuplicates,
@@ -470,7 +474,7 @@ test('several entries on one day: the later written one has the latest focus', (
 
 test('normalizeEntries gives older date-keyed entries an id and a date, and drops what is not an entry', () => {
   const clean = normalizeEntries({ '2026-10-05': { feeling: 'sharp' }, x1: { id: 'x1', date: '2026-10-06', feeling: 'tired' }, bad: 'oops' });
-  equal(clean['2026-10-05'], { feeling: 'sharp', id: '2026-10-05', date: '2026-10-05' });
+  equal(clean['2026-10-05'], { feeling: 'sharp', id: '2026-10-05', date: '2026-10-05', video: null, videoNotes: [] });
   equal(clean.x1.date, '2026-10-06');
   equal(clean.bad, undefined);
   equal(normalizeEntries(null), {});
@@ -1517,6 +1521,84 @@ test('todayItems on a tie puts the session before the meal, and adds the next me
   const none = todayItems([], [{ id: 'm', day: 4, name: 'Breakfast', desc: '', time: '' }], now);
   equal([none.length, none[0].kind, none[0].daysAhead], [1, 'meal', 1]);
   equal(todayItems([], [], now), []);
+});
+
+// ---------- fixes from the adversarial check (2026-11-11) ----------
+test('a second press right after the first is a stray double-click, a later one is on purpose', () => {
+  equal(isStrayClick(1000, 1200), true);
+  equal(isStrayClick(1000, 1900), false);
+  equal(isStrayClick(null, 1200), false);
+});
+
+test('feelingOf gives a placeholder for an entry whose feeling is missing or unknown', () => {
+  equal(feelingOf({ feeling: 'sharp' }).label, 'Sharp');
+  equal(feelingOf({}).label, 'No feeling');
+  equal(feelingOf({ feeling: 'angry' }).label, 'No feeling');
+});
+
+test('normalizeEntries blanks an unknown feeling and cleans a damaged video and notes', () => {
+  const clean = normalizeEntries({
+    a: { feeling: 'angry', text: 'kept', video: { kind: 'file', id: '../x', name: 5 }, videoNotes: 'garbage' },
+    b: { feeling: 'tired', video: { kind: 'youtube', id: 'dQw4w9WgXcQ' }, videoNotes: [{ time: 5, text: 'hi' }, { time: -1, text: 'bad' }] },
+  });
+  equal([clean.a.feeling, clean.a.text, clean.a.video, clean.a.videoNotes], ['', 'kept', null, []]);
+  equal([clean.b.feeling, clean.b.video.id, clean.b.videoNotes], ['tired', 'dQw4w9WgXcQ', [{ time: 5, text: 'hi' }]]);
+});
+
+test('normalizeSort accepts a damaged saved sort setting', () => {
+  equal(normalizeSort(null), { by: 'created', order: 'desc' });
+  equal(normalizeSort('oops'), { by: 'created', order: 'desc' });
+  equal(normalizeSort({ by: 'nonsense', order: 'asc' }), { by: 'created', order: 'asc' });
+});
+
+test('cleanTicks keeps only lists of text keys per session', () => {
+  equal(cleanTicks(null), {});
+  equal(cleanTicks({ s1: 5, s2: ['a', 3, 'b'], s3: ['x'] }), { s2: ['a', 'b'], s3: ['x'] });
+});
+
+test('renameTick moves a tick to the edited step, and leaves an unticked step alone', () => {
+  const before = { name: 'Lunges', desc: 'slow' };
+  const after = { name: 'Lunges', desc: 'fast' };
+  equal(renameTick([stepKey(before), 'other'], before, after), [stepKey(after), 'other']);
+  equal(renameTick(['other'], before, after), ['other']);
+});
+
+test('adding a step to a finished session un-finishes it (Done follows the ticks)', () => {
+  const one = [{ name: 'A', desc: '' }];
+  const two = [...one, { name: 'B', desc: '' }];
+  const ticked = [stepKey(one[0])];
+  equal(doneAfterTick(sessionProgress(one, ticked), sessionProgress(two, ticked)), false);
+});
+
+test('cleanSessions drops entries that are not sessions', () => {
+  const good = { id: 'a', date: '2026-11-05', time: '18:00', mins: 60, type: 'bout', done: false };
+  equal(cleanSessions([good, null, 5, 'x', { date: '2026-11-05' }]), [good]);
+  equal(cleanSessions(null), []);
+});
+
+test('cleanSavedRoutines drops a saved routine that has no steps left', () => {
+  const saved = { footwork: [
+    { id: 'r1', name: 'Empty', savedAt: '', steps: [] },
+    { id: 'r2', name: 'Full', savedAt: '', steps: [{ name: 'A', desc: '' }] },
+  ] };
+  equal(cleanSavedRoutines(saved).footwork.map((routine) => routine.id), ['r2']);
+});
+
+test('a video note counts emoji as one character each', () => {
+  const emoji = '😀'.repeat(150);
+  equal(validateVideoNote({ time: '0:05', text: emoji }).error, undefined);
+  equal(validateVideoNote({ time: '0:05', text: '😀'.repeat(201) }).error !== undefined, true);
+});
+
+test('names with hidden text-direction characters are refused', () => {
+  equal(validateRoutineName('Lunges\u202Eevil', []) !== null, true);
+  equal(validateStep({ name: 'Lunges\u202E', desc: '' }).error !== undefined, true);
+  equal(validateRoutineName('Family 👨‍👩‍👧 drills', []), null);
+});
+
+test('a word that is not a web address says it does not look like a link', () => {
+  equal(parseYouTubeLink('notalink').error.startsWith('That does not look like a link'), true);
+  equal(parseYouTubeLink('https://example.com/watch?v=dQw4w9WgXcQ').error.startsWith('Only YouTube'), true);
 });
 
 const failures = results.filter((r) => r.error);

@@ -1,5 +1,6 @@
 import { showDialog } from './dialog-motion.js';
 import { burstConfetti } from './confetti.js';
+import { isStrayClick } from './confirm.js';
 import { setFoldSummary } from './foldable-cards.js';
 import { foldBody, setFolded } from './fold.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
@@ -61,6 +62,7 @@ const copyDialog = $('#copyDialog');
 let editingMealId = null;
 let formDay = 0;
 let confirmingDelete = false;
+let deleteArmedAt = null;
 let copyFromDay = 0;
 
 function persist() {
@@ -496,6 +498,7 @@ function openMealForm(meal, day) {
   editingMealId = meal ? meal.id : null;
   formDay = day;
   confirmingDelete = false;
+  deleteArmedAt = null;
   $('#mealDialogTitle').textContent = (meal ? 'Edit meal' : 'Add a meal') + ' — ' + DAY_NAMES[day];
   setMealName(meal ? meal.name : '');
   $('#mDesc').value = meal ? meal.desc : '';
@@ -611,9 +614,11 @@ closeOnBackdropClick(linkedMealDialog);
 $('#mealDelete').addEventListener('click', () => {
   if (!confirmingDelete) {
     confirmingDelete = true;
+    deleteArmedAt = Date.now();
     $('#mealDelete').textContent = 'Really delete?';
     return;
   }
+  if (isStrayClick(deleteArmedAt, Date.now())) return;
   meals = meals.filter((m) => m.id !== editingMealId);
   persist();
   mealDialog.close();

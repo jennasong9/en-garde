@@ -732,6 +732,10 @@ dialog {
   overflow-y: auto;
 }
 dialog::backdrop { background: var(--backdrop); }
+/* The Journal form gets long once a video is attached, so on a phone Save stays in view. */
+@media (max-width: 600px) {
+  #journalForm .form-actions { position: sticky; bottom: -20px; margin: 0 -20px -20px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface); }
+}
 .dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .dialog-head h2 { font-size: 20px; }
 form { display: flex; flex-direction: column; gap: 14px; }

@@ -1,6 +1,6 @@
 import { $, el } from './dom.js';
 import { DEFAULT_GLASS_GOAL, glassesToday } from './meals.js';
-import { SESSION_TYPES, formatTime, toIso, weekStats } from './schedule.js';
+import { SESSION_TYPES, cleanSessions, formatTime, toIso, weekStats } from './schedule.js';
 import { setFoldSummary } from './foldable-cards.js';
 import { loadJson } from './storage.js';
 import { mealWhen, todayItems, todayLine, weekLine } from './today.js';
@@ -64,7 +64,7 @@ function itemRows(items) {
 
 export function renderTodayTray() {
   const now = new Date();
-  const sessions = savedList('sessions');
+  const sessions = cleanSessions(savedList('sessions'));
   const items = todayItems(sessions.filter((session) => SESSION_TYPES[session.type]), savedList('meals'), now);
   const todaySessions = items.filter((item) => item.kind === 'session').map((item) => item.session);
 
