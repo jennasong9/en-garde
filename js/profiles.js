@@ -31,6 +31,25 @@ export function validateNewProfile(form) {
   };
 }
 
+// What was typed on the welcome form, kept for the length of the tab so a refresh does not wipe it.
+// Returns the form's fields with anything unusable replaced by its starting value, or null when
+// there is no draft.
+export function cleanDraft(saved) {
+  if (saved === null || typeof saved !== 'object' || Array.isArray(saved)) return null;
+  const text = (value) => (typeof value === 'string' ? value : '');
+  return {
+    name: text(saved.name),
+    weapon: WEAPONS.includes(saved.weapon) ? saved.weapon : '',
+    club: text(saved.club),
+    rating: text(saved.rating),
+    trackerLink: text(saved.trackerLink),
+    theme: THEME_CHOICES.includes(saved.theme) ? saved.theme : 'auto',
+    font: FONT_CHOICES.includes(saved.font) ? saved.font : 'sans',
+    mealReminders: saved.mealReminders === true,
+    waterReminders: saved.waterReminders === true,
+  };
+}
+
 // The saved values a new profile starts with, keyed the way the app stores them. "Match my
 // device" for the theme means saving nothing, so the app keeps following the device.
 export function startingData(profile) {

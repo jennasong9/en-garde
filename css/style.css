@@ -878,6 +878,8 @@ form h3 { font-size: 17px; }
 .welcome-card h3 { margin: 12px 0 0; font-size: 15px; }
 .welcome-card h3 small { font-weight: 400; color: var(--text-dim); }
 .welcome-lead { margin: 0; color: var(--text-dim); }
+.welcome-guide { margin: 0; padding: 10px 12px; border-radius: var(--radius-s); background: var(--sage-soft); color: var(--text); font-size: 14px; }
+.welcome-hint { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--text-dim); }
 .welcome-card form, .welcome-card section { display: flex; flex-direction: column; gap: 14px; }
 .welcome-card form[hidden], .welcome-card section[hidden] { display: none; }
 .welcome-profiles { display: flex; flex-direction: column; gap: 8px; }

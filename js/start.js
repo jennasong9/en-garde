@@ -10,7 +10,7 @@ import {
   saveProfileList,
   setActiveProfile,
 } from './storage.js';
-import { cleanProfileList, newProfileId, profileSummary, startingData, validateNewProfile } from './profiles.js';
+import { cleanDraft, cleanProfileList, newProfileId, profileSummary, startingData, validateNewProfile } from './profiles.js';
 
 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -69,9 +69,11 @@ function showSavedProfiles(list) {
   }));
 }
 
-function createProfile(event) {
-  event.preventDefault();
-  const result = validateNewProfile({
+const DRAFT_KEY = 'engarde_welcomeDraft';
+
+// What is typed in the form right now.
+function formValues() {
+  return {
     name: $('#wName').value,
     weapon: chosen($('#wWeapon')),
     club: $('#wClub').value,
@@ -81,7 +83,53 @@ function createProfile(event) {
     font: chosen($('#wFont')),
     mealReminders: $('#wMealReminders').checked,
     waterReminders: $('#wWaterReminders').checked,
-  });
+  };
+}
+
+// The form is kept for the life of the tab, so a refresh in the middle of setup does not wipe it.
+// (It is session storage, so it is gone when the tab closes, and it is cleared once the profile is made.)
+function saveDraft() {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(formValues()));
+  } catch (error) {
+    // Without storage the form just starts empty after a refresh.
+  }
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch (error) {
+    // Nothing to clear.
+  }
+}
+
+function restoreDraft() {
+  let draft = null;
+  try {
+    draft = cleanDraft(JSON.parse(sessionStorage.getItem(DRAFT_KEY)));
+  } catch (error) {
+    return false;
+  }
+  if (!draft) return false;
+  $('#wName').value = draft.name;
+  $('#wClub').value = draft.club;
+  $('#wRating').value = draft.rating;
+  $('#wTracker').value = draft.trackerLink;
+  $('#wMealReminders').checked = draft.mealReminders;
+  $('#wWaterReminders').checked = draft.waterReminders;
+  for (const [id, value] of [['#wWeapon', draft.weapon], ['#wTheme', draft.theme], ['#wFont', draft.font]]) {
+    const group = $(id);
+    const button = [...group.querySelectorAll('[role="radio"]')].find((option) => option.dataset.value === value);
+    if (button) chooseInGroup(group, button);
+  }
+  previewLook();
+  return true;
+}
+
+function createProfile(event) {
+  event.preventDefault();
+  const result = validateNewProfile(formValues());
   if (result.error) {
     $('#wError').textContent = result.error;
     return;
@@ -94,6 +142,7 @@ function createProfile(event) {
     return;
   }
   saveProfileList([...loadProfileList(), { id, name: profile.name, weapon: profile.weapon, club: profile.club }]);
+  clearDraft();
   setActiveProfile(id);
   window.location.reload();
 }
@@ -117,6 +166,13 @@ function showWelcome() {
     $('#wName').focus();
   });
   $('#wNewForm').addEventListener('submit', createProfile);
+  $('#wNewForm').addEventListener('input', saveDraft);
+  $('#wNewForm').addEventListener('click', saveDraft);
+  // A refresh in the middle of setup brings back what was typed, and shows the form again.
+  if (restoreDraft()) {
+    $('#wNewForm').hidden = false;
+    $('#wShowNew').hidden = true;
+  }
 }
 
 if (loadProfileList().length === 0) adoptOldData();

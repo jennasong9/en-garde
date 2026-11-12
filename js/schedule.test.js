@@ -96,7 +96,7 @@ import {
 import { RATING_LADDER, currentRating, earnGoalName, isRatingGoalName, parseRating, ratingGoalConflict, ratingLabel, ratingTargets } from './rating.js';
 import { mealWhen, todayItems, todayLine, weekLine } from './today.js';
 import { checkVideoFile, MAX_VIDEO_BYTES, normalizeVideo, parseYouTubeLink, videoLabel } from './stepvideo.js';
-import { cleanProfileList, newProfileId, profileSummary, startingData, validateNewProfile } from './profiles.js';
+import { cleanDraft, cleanProfileList, newProfileId, profileSummary, startingData, validateNewProfile } from './profiles.js';
 
 const results = [];
 
@@ -1599,6 +1599,13 @@ test('names with hidden text-direction characters are refused', () => {
 test('a word that is not a web address says it does not look like a link', () => {
   equal(parseYouTubeLink('notalink').error.startsWith('That does not look like a link'), true);
   equal(parseYouTubeLink('https://example.com/watch?v=dQw4w9WgXcQ').error.startsWith('Only YouTube'), true);
+});
+
+test('cleanDraft keeps what was typed on the welcome form and drops anything unusable', () => {
+  const draft = cleanDraft({ name: 'Jenna', weapon: 'Foil', club: 'Point', rating: 'B26', theme: 'dark', font: 'mono', mealReminders: true, waterReminders: 'yes', extra: 'x' });
+  equal(draft, { name: 'Jenna', weapon: 'Foil', club: 'Point', rating: 'B26', trackerLink: '', theme: 'dark', font: 'mono', mealReminders: true, waterReminders: false });
+  equal(cleanDraft({ name: 5, weapon: 'Axe', theme: 'neon', font: 'comic' }), { name: '', weapon: '', club: '', rating: '', trackerLink: '', theme: 'auto', font: 'sans', mealReminders: false, waterReminders: false });
+  equal(cleanDraft(null), null);
 });
 
 const failures = results.filter((r) => r.error);

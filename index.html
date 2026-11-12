@@ -46,11 +46,14 @@
 
       <form id="wNewForm" novalidate>
         <h2>Create your profile</h2>
+        <p class="welcome-guide">This takes about a minute. Only your name and weapon are needed; everything else is optional, and you can change any of it later in Settings (the gear icon). It is all saved on this device, and what you type here is kept if you refresh.</p>
         <label class="field">Name
           <input type="text" id="wName" maxlength="60" autocomplete="off" required>
+          <small class="welcome-hint">Shown at the top of every page.</small>
         </label>
         <div class="field" role="radiogroup" aria-label="Weapon" id="wWeapon">
           <span>Weapon</span>
+          <small class="welcome-hint">Pick the one you fence.</small>
           <div class="font-options">
             <button type="button" role="radio" aria-checked="false" class="font-option" data-value="Foil">Foil</button>
             <button type="button" role="radio" aria-checked="false" class="font-option" data-value="Epee">Epee</button>
@@ -65,6 +68,7 @@
         <div class="field-row">
           <label class="field">Rating
             <input type="text" id="wRating" maxlength="12" placeholder="e.g. B26" autocomplete="off">
+            <small class="welcome-hint">Leave blank if you are unrated. The Goals page uses it.</small>
           </label>
         </div>
         <label class="field">FencingTracker profile link
@@ -92,6 +96,7 @@
         <label class="switch-row" for="wWaterReminders"><span>Remind me to drink water</span><input type="checkbox" role="switch" id="wWaterReminders" class="switch-toggle"></label>
 
         <p class="form-error" id="wError" role="alert"></p>
+        <p class="welcome-guide">Next you will see your Schedule, empty at first. Tap any day to add your first practice.</p>
         <button class="btn" type="submit">Start training</button>
       </form>
     </div>
