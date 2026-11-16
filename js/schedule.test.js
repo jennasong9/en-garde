@@ -53,6 +53,16 @@ import {
   dayMacroTotals,
   dayTotals,
   glassesToday,
+  clearPrepped,
+  hydrationSummary,
+  isNewMealWeek,
+  mealWeekStart,
+  macroDayResult,
+  macroWeekHistory,
+  preppedMacroTotals,
+  recordMacros,
+  recordGlasses,
+  weekHistory,
   hasCustomOrder,
   linkedMeals,
   macroKcal,
@@ -378,6 +388,101 @@ test('tapGlass fills up to the tapped glass and undoes when the last one is tapp
   equal(tapGlass(3, 1), 2);
   equal(tapGlass(3, 2), 2);
   equal(tapGlass(1, 0), 0);
+});
+
+test('preppedMacroTotals adds up only the prepped meals of one day', () => {
+  const plan = [
+    { day: 2, prepped: true, protein: 30, carb: 40, fat: 10 },
+    { day: 2, prepped: false, protein: 50, carb: 50, fat: 50 },
+    { day: 3, prepped: true, protein: 99, carb: 99, fat: 99 },
+  ];
+  equal(preppedMacroTotals(plan, 2), { protein: 30, carb: 40, fat: 10 });
+});
+
+test('macroDayResult hits a macro from 90 to 110 percent of its target, and ignores macros with no target', () => {
+  const targets = { protein: 100, carb: 200, fat: null };
+  const result = macroDayResult({ protein: 90, carb: 220, fat: 40 }, targets);
+  equal(result.macros, { protein: { percent: 90, hit: true }, carb: { percent: 110, hit: true } });
+  equal(result.allHit, true);
+  const miss = macroDayResult({ protein: 89, carb: 200, fat: 0 }, targets);
+  equal(miss.macros.protein.hit, false);
+  equal(miss.allHit, false);
+  equal(macroDayResult({ protein: 111, carb: 200, fat: 0 }, targets).macros.protein.hit, false);
+  equal(macroDayResult({ protein: 5, carb: 5, fat: 5 }, { protein: null, carb: null, fat: null }).allHit, false);
+});
+
+test('macroWeekHistory gives each day its result, and null for a day with nothing saved or no targets', () => {
+  const log = {
+    '2026-10-12': { protein: 100, carb: 200, fat: 50, targets: { protein: 100, carb: 200, fat: 50 } },
+    '2026-10-13': { protein: 10, carb: 0, fat: 0, targets: { protein: null, carb: null, fat: null } },
+  };
+  const week = macroWeekHistory(log, ['2026-10-11', '2026-10-12', '2026-10-13']);
+  equal(week[0].result, null);
+  equal(week[1].result.allHit, true);
+  equal(week[2].result, null);
+});
+
+test('recordMacros saves a day with its targets and keeps only the most recent days', () => {
+  const targets = { protein: 100, carb: 200, fat: 50 };
+  equal(recordMacros({}, '2026-10-13', { protein: 1, carb: 2, fat: 3 }, targets), { '2026-10-13': { protein: 1, carb: 2, fat: 3, targets } });
+  let big = {};
+  for (let day = 1; day <= 70; day += 1) big = recordMacros(big, '2026-01-' + String(day).padStart(2, '0'), { protein: 0, carb: 0, fat: 0 }, targets);
+  equal(Object.keys(big).length, 60);
+});
+
+test('mealWeekStart is the Monday of the week, with Sunday ending the week before', () => {
+  equal(mealWeekStart(new Date(2026, 10, 16)), '2026-11-16');
+  equal(mealWeekStart(new Date(2026, 10, 18)), '2026-11-16');
+  equal(mealWeekStart(new Date(2026, 10, 22)), '2026-11-16');
+  equal(mealWeekStart(new Date(2026, 10, 23)), '2026-11-23');
+  equal(mealWeekStart(new Date(2026, 0, 1)), '2025-12-29');
+});
+
+test('a new meal week starts only when an earlier week was saved', () => {
+  equal(isNewMealWeek('2026-11-09', '2026-11-16'), true);
+  equal(isNewMealWeek('2026-11-16', '2026-11-16'), false);
+  equal(isNewMealWeek('', '2026-11-16'), false);
+  equal(isNewMealWeek(undefined, '2026-11-16'), false);
+});
+
+test('clearPrepped unticks every meal and changes nothing else', () => {
+  const plan = [{ id: 'a', day: 1, name: 'Oats', prepped: true }, { id: 'b', day: 2, name: 'Rice', prepped: false }];
+  equal(clearPrepped(plan), [{ id: 'a', day: 1, name: 'Oats', prepped: false }, { id: 'b', day: 2, name: 'Rice', prepped: false }]);
+  equal(plan[0].prepped, true);
+});
+
+test('hydrationSummary reports percent, glasses left, ounces and a message', () => {
+  const none = hydrationSummary(0, 8);
+  equal(none.percent, 0);
+  equal(none.remaining, 8);
+  equal(none.ounces, 0);
+  equal(none.goalOunces, 64);
+  const some = hydrationSummary(3, 8);
+  equal(some.percent, 38);
+  equal(some.ounces, 24);
+  equal(some.message, '5 more glasses to go');
+  equal(hydrationSummary(7, 8).message, '1 more glass to go');
+  const done = hydrationSummary(8, 8);
+  equal(done.percent, 100);
+  equal(done.remaining, 0);
+});
+
+test('recordGlasses saves a day and keeps only the most recent days', () => {
+  equal(recordGlasses({}, '2026-10-13', 4, 8), { '2026-10-13': { glasses: 4, goal: 8 } });
+  const updated = recordGlasses({ '2026-10-13': { glasses: 4, goal: 8 } }, '2026-10-13', 5, 8);
+  equal(updated['2026-10-13'].glasses, 5);
+  let big = {};
+  for (let day = 1; day <= 70; day += 1) big = recordGlasses(big, '2026-01-' + String(day).padStart(2, '0'), 1, 8);
+  equal(Object.keys(big).length, 60);
+});
+
+test('weekHistory lists each day, treating a day with nothing saved as zero glasses', () => {
+  const week = weekHistory({ '2026-10-12': { glasses: 8, goal: 8 }, '2026-10-13': { glasses: 2, goal: 6 } }, ['2026-10-11', '2026-10-12', '2026-10-13'], 8);
+  equal(week[0], { iso: '2026-10-11', glasses: 0, goal: 8, percent: 0, met: false });
+  equal(week[1].met, true);
+  equal(week[1].percent, 100);
+  equal(week[2].percent, 33);
+  equal(week[2].met, false);
 });
 
 // ---------- journal ----------

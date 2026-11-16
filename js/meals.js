@@ -127,6 +127,70 @@ export function macroProgress(total, target) {
   return { percent: Math.min(100, Math.round((total * 100) / target)), over: total > target };
 }
 
+// The weeks of the meal plan run Monday to Sunday. This is the ISO date of the Monday on or
+// before `date`.
+export function mealWeekStart(date) {
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - ((date.getDay() + 6) % 7));
+  return monday.getFullYear() + '-' + String(monday.getMonth() + 1).padStart(2, '0') + '-' + String(monday.getDate()).padStart(2, '0');
+}
+
+// A new week has begun when a week was saved before and it is not this one. With nothing saved yet
+// there is nothing to compare, so the ticks are left alone.
+export function isNewMealWeek(savedWeek, thisWeek) {
+  return typeof savedWeek === 'string' && savedWeek !== '' && savedWeek !== thisWeek;
+}
+
+// The same meals with every Prepped tick cleared, for the start of a new week.
+export function clearPrepped(meals) {
+  return meals.map((meal) => (meal.prepped ? { ...meal, prepped: false } : meal));
+}
+
+// A macro counts as hit for a day when the prepped meals come to 90 to 110 percent of its target.
+export const MACRO_HIT_MIN = 90;
+export const MACRO_HIT_MAX = 110;
+const MAX_LOGGED_MACRO_DAYS = 60;
+
+// Grams of each macro from the meals ticked as prepped on one day (what was really eaten).
+export function preppedMacroTotals(meals, day) {
+  return dayMacroTotals(meals.filter((meal) => meal.prepped), day);
+}
+
+// How one day went: for every macro that had a target, the percent of it reached (not capped)
+// and whether that is within the hit range. `allHit` is true when there was at least one target
+// and every one was hit.
+export function macroDayResult(totals, targets) {
+  const macros = {};
+  for (const macro of MACROS) {
+    const target = targets[macro];
+    if (!target) continue;
+    macros[macro] = {
+      percent: Math.round((totals[macro] * 100) / target),
+      hit: totals[macro] * 100 >= MACRO_HIT_MIN * target && totals[macro] * 100 <= MACRO_HIT_MAX * target,
+    };
+  }
+  const tracked = Object.values(macros);
+  return { macros, allHit: tracked.length > 0 && tracked.every((result) => result.hit) };
+}
+
+// The saved history, { 'YYYY-MM-DD': { protein, carb, fat, targets } }, with `iso`'s prepped grams
+// and that day's targets recorded. Only the most recent days are kept.
+export function recordMacros(log, iso, totals, targets) {
+  const entry = { protein: totals.protein, carb: totals.carb, fat: totals.fat, targets: { protein: targets.protein, carb: targets.carb, fat: targets.fat } };
+  const updated = { ...log, [iso]: entry };
+  const recent = Object.keys(updated).sort().slice(-MAX_LOGGED_MACRO_DAYS);
+  return Object.fromEntries(recent.map((day) => [day, updated[day]]));
+}
+
+// One entry for each of `days` (ISO dates, oldest first): that day's result, or null when nothing
+// was saved or no target was set that day.
+export function macroWeekHistory(log, days) {
+  return days.map((iso) => {
+    const saved = log[iso];
+    const result = saved ? macroDayResult(saved, saved.targets || {}) : null;
+    return { iso, result: result && Object.keys(result.macros).length > 0 ? result : null };
+  });
+}
+
 // ---------- hydration ----------
 export const DEFAULT_GLASS_GOAL = 8;
 export const MAX_GLASS_GOAL = 20;
@@ -139,6 +203,45 @@ export function glassesToday(hydration, todayIso) {
 // Tapping glass number `index` (0-based) fills up to it; tapping the last filled glass undoes it.
 export function tapGlass(current, index) {
   return index + 1 === current ? current - 1 : index + 1;
+}
+
+// Each glass counts as 8 fluid ounces (about 240 ml) when showing volume.
+export const OUNCES_PER_GLASS = 8;
+const MAX_LOGGED_DAYS = 60;
+
+// Today's water in numbers and words: percent of the goal (capped at 100), glasses still to go,
+// ounces drunk and ounces in the goal, and a short line about where the day stands.
+export function hydrationSummary(glasses, goal) {
+  const remaining = Math.max(0, goal - glasses);
+  let message = remaining + ' more ' + (remaining === 1 ? 'glass' : 'glasses') + ' to go';
+  if (glasses === 0) message = 'Nothing logged yet. Tap a drop to log your first glass.';
+  if (remaining === 0) message = 'Goal reached. Nice work staying hydrated!';
+  return {
+    percent: goal > 0 ? Math.min(100, Math.round((glasses * 100) / goal)) : 0,
+    remaining,
+    ounces: glasses * OUNCES_PER_GLASS,
+    goalOunces: goal * OUNCES_PER_GLASS,
+    message,
+  };
+}
+
+// The saved history, { 'YYYY-MM-DD': { glasses, goal } }, with `iso`'s count recorded. Only the
+// most recent days are kept so the saved history stays small.
+export function recordGlasses(log, iso, glasses, goal) {
+  const updated = { ...log, [iso]: { glasses, goal } };
+  const recent = Object.keys(updated).sort().slice(-MAX_LOGGED_DAYS);
+  return Object.fromEntries(recent.map((day) => [day, updated[day]]));
+}
+
+// One entry for each of `days` (ISO dates, oldest first): glasses drunk, that day's goal (today's
+// goal for a day with nothing saved), the percent of it reached, and whether it was met.
+export function weekHistory(log, days, fallbackGoal) {
+  return days.map((iso) => {
+    const saved = log[iso];
+    const glasses = saved ? saved.glasses : 0;
+    const goal = saved ? saved.goal : fallbackGoal;
+    return { iso, glasses, goal, percent: Math.min(100, Math.round((glasses * 100) / goal)), met: glasses >= goal };
+  });
 }
 
 // Confetti when a release takes the day's water from short of the goal to the goal.

@@ -284,6 +284,9 @@
           <div class="fold"><div class="fold-inner">
           <div class="macro-targets" id="macroTargets"></div>
           <p class="macro-total" id="macroTotal"></p>
+          <h3 class="water-week-title" id="macroWeekTitle">Last 7 days</h3>
+          <div class="water-week" id="macroWeek"></div>
+          <p class="hydration-detail" id="macroWeekNote"></p>
           <p class="form-error" id="targetError" role="alert"></p>
           </div></div>
         </section>
@@ -292,7 +295,12 @@
           <span class="fold-summary"></span>
           <div class="fold"><div class="fold-inner">
           <div class="drops" id="drops"></div>
+          <div class="water-bar" id="waterBar" role="progressbar" aria-label="Water today" aria-valuemin="0" aria-valuemax="100"><span></span></div>
           <p class="hydration-text" id="hydrationText"></p>
+          <p class="hydration-detail" id="hydrationDetail"></p>
+          <h3 class="water-week-title">Last 7 days</h3>
+          <div class="water-week" id="waterWeek"></div>
+          <p class="hydration-detail" id="waterWeekNote"></p>
           <label class="field goal-field">Daily goal (glasses)
             <input type="number" id="glassGoal" min="1" max="20" inputmode="numeric">
           </label>

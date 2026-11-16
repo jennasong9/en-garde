@@ -15,25 +15,31 @@ import {
   applyToLinked,
   changesSharedDetails,
   clearOrder,
+  clearPrepped,
   copyDay,
   copyMeal,
   dayMacroTotals,
   dayTotals,
   hasCustomOrder,
+  isNewMealWeek,
   linkedMeals,
   macroKcal,
   macroProgress,
   macroShares,
+  macroWeekHistory,
+  mealWeekStart,
   mealsOn,
   mergeIntoHistory,
   moveMeal,
   parseGrams,
   parseKcal,
   placeMeal,
+  preppedMacroTotals,
+  recordMacros,
   removeFromHistory,
   searchHistory,
 } from './meals.js';
-import { makeId, formatTime } from './schedule.js';
+import { addDays, makeId, formatTime, parseIso, toIso } from './schedule.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import { initExportPlan } from './export-plan.js';
 import { buildMenu, setupMenu } from './menu.js';
@@ -57,6 +63,10 @@ const MACRO_LABELS = { protein: 'Protein', carb: 'Carbs', fat: 'Fat' };
 const storedTargets = loadJson('macroTargets', {});
 let macroTargets = { protein: null, carb: null, fat: null, ...storedTargets };
 
+// Each day's prepped grams and targets, { 'YYYY-MM-DD': {...} }, for the macro "Last 7 days" chart.
+const storedMacroLog = loadJson('macroLog', {});
+let macroLog = storedMacroLog && typeof storedMacroLog === 'object' && !Array.isArray(storedMacroLog) ? storedMacroLog : {};
+
 const mealDialog = $('#mealDialog');
 const copyDialog = $('#copyDialog');
 let editingMealId = null;
@@ -69,6 +79,26 @@ function persist() {
   saveJson('meals', meals);
   saveJson('mealHistory', history);
 }
+
+// Prepped ticks start fresh every Monday. The week the ticks belong to is saved, so opening the
+// app (or coming back to its tab) in a later week clears them. Returns true when it did.
+function startNewWeekIfNeeded() {
+  const thisWeek = mealWeekStart(new Date());
+  const savedWeek = loadJson('mealsWeek', '');
+  const isNew = isNewMealWeek(savedWeek, thisWeek);
+  if (isNew) {
+    meals = clearPrepped(meals);
+    persist();
+  }
+  if (savedWeek !== thisWeek) saveJson('mealsWeek', thisWeek);
+  return isNew;
+}
+startNewWeekIfNeeded();
+
+// A new week may begin while the page sits open in a tab.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && startNewWeekIfNeeded()) renderNutrition();
+});
 
 // Remembers a saved meal in the history (at the top).
 function remember(meal) {
@@ -117,9 +147,58 @@ document.addEventListener('meal-prepped-change', (event) => {
   if (!wasDone && allPrepped(dayTotals(meals, meal.day))) burstConfetti(x, y);
 });
 
+// Saves today's prepped grams against today's targets when they changed. Nothing is saved for a
+// day with no targets and no earlier record.
+function recordTodayMacros() {
+  const iso = toIso(new Date());
+  const entry = recordMacros({}, iso, preppedMacroTotals(meals, new Date().getDay()), macroTargets)[iso];
+  if (!macroLog[iso] && !MACROS.some((macro) => macroTargets[macro])) return;
+  if (JSON.stringify(macroLog[iso]) === JSON.stringify(entry)) return;
+  macroLog = recordMacros(macroLog, iso, entry, macroTargets);
+  saveJson('macroLog', macroLog);
+}
+
+// A small group of bars for each of the last 7 days: one bar per macro, with a shaded band at the
+// 90 to 110 percent range. A bar is faded unless it landed in the band.
+function renderMacroWeek() {
+  const today = toIso(new Date());
+  const days = Array.from({ length: 7 }, (_, index) => addDays(today, index - 6));
+  const week = macroWeekHistory(macroLog, days);
+  const hasTargets = MACROS.some((macro) => macroTargets[macro]);
+  $('#macroWeek').hidden = !hasTargets;
+  $('#macroWeekTitle').hidden = !hasTargets;
+  if (!hasTargets) {
+    $('#macroWeek').replaceChildren();
+    $('#macroWeekNote').textContent = 'Set a target above and tick meals as prepped to see how each day went.';
+    return;
+  }
+  $('#macroWeek').replaceChildren(...week.map(({ iso, result }) => {
+    const name = iso === today ? 'Today' : parseIso(iso).toLocaleDateString(undefined, { weekday: 'short' });
+    const bars = el('div', { class: 'macro-day-bars' }, el('div', { class: 'macro-day-band' }));
+    for (const macro of MACROS) {
+      const entry = result && result.macros[macro];
+      if (!entry) continue;
+      const bar = el('div', { class: 'macro-mini ' + macro + (entry.hit ? ' hit' : '') });
+      bar.style.setProperty('--pct', Math.min(125, entry.percent) / 125 * 100 + '%');
+      bars.append(bar);
+    }
+    const detail = result
+      ? Object.entries(result.macros).map(([macro, entry]) => MACRO_LABELS[macro] + ' ' + entry.percent + '%').join(', ')
+      : 'nothing recorded';
+    return el('div', {
+      class: 'water-day' + (result && result.allHit ? ' met' : '') + (iso === today ? ' today' : ''),
+      title: name + ': ' + detail,
+    }, bars, el('span', { class: 'water-day-count', text: result && result.allHit ? '\u2713' : '\u00a0' }), el('span', { class: 'water-day-name', text: name }));
+  }));
+  const hitDays = week.filter(({ result }) => result && result.allHit).length;
+  $('#macroWeekNote').textContent = 'All targets hit on ' + hitDays + ' of the last 7 days. Bars count only prepped meals; the shaded band is 90 to 110% of the target, and a check means every macro landed in it.';
+}
+
 export function renderNutrition() {
   renderTodayTray();
   renderMacroTargets();
+  recordTodayMacros();
+  renderMacroWeek();
   const today = new Date().getDay();
   $('#mealGrid').replaceChildren(...WEEK_ORDER.map((day) => dayColumn(DAY_NAMES[day], day, day === today)), historyPanel());
   updateExpandAll();

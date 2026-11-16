@@ -1,8 +1,8 @@
 import { $, el, makeDraggable } from './dom.js';
 import { burstConfetti } from './confetti.js';
 import { setFoldSummary } from './foldable-cards.js';
-import { DEFAULT_GLASS_GOAL, MAX_GLASS_GOAL, glassesToday, reachedWaterGoal, tapGlass } from './meals.js';
-import { toIso } from './schedule.js';
+import { DEFAULT_GLASS_GOAL, MAX_GLASS_GOAL, glassesToday, hydrationSummary, reachedWaterGoal, recordGlasses, tapGlass, weekHistory } from './meals.js';
+import { addDays, parseIso, toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
 import { renderTodayTray } from './today-tray.js';
 
@@ -14,8 +14,14 @@ let hydration = {
   goal: Number.isInteger(stored.goal) && stored.goal >= 1 && stored.goal <= MAX_GLASS_GOAL ? stored.goal : DEFAULT_GLASS_GOAL,
 };
 
+// Past days' counts, { 'YYYY-MM-DD': { glasses, goal } }, for the "Last 7 days" chart.
+const storedLog = loadJson('hydrationLog', {});
+let hydrationLog = storedLog && typeof storedLog === 'object' && !Array.isArray(storedLog) ? storedLog : {};
+
 function persist() {
   saveJson('hydration', hydration);
+  hydrationLog = recordGlasses(hydrationLog, toIso(new Date()), currentGlasses(), hydration.goal);
+  saveJson('hydrationLog', hydrationLog);
 }
 
 function currentGlasses() {
@@ -46,8 +52,29 @@ export function renderHydration() {
     'aria-pressed': String(index < glasses),
   }, dropIcon())));
   showGlasses(glasses);
+  renderWeek();
   if (document.activeElement !== $('#glassGoal')) $('#glassGoal').value = hydration.goal;
   renderTodayTray();
+}
+
+// A small bar for each of the last 7 days, filled by how much of that day's goal was reached.
+function renderWeek() {
+  const today = toIso(new Date());
+  const days = Array.from({ length: 7 }, (_, index) => addDays(today, index - 6));
+  const week = weekHistory(hydrationLog, days, hydration.goal).map((day) => day.iso === today
+    ? { ...day, glasses: currentGlasses(), goal: hydration.goal, percent: hydrationSummary(currentGlasses(), hydration.goal).percent, met: currentGlasses() >= hydration.goal }
+    : day);
+  $('#waterWeek').replaceChildren(...week.map((day) => {
+    const name = day.iso === today ? 'Today' : parseIso(day.iso).toLocaleDateString(undefined, { weekday: 'short' });
+    const track = el('div', { class: 'water-day-track' }, el('div', { class: 'water-day-fill' }));
+    track.style.setProperty('--pct', day.percent + '%');
+    return el('div', {
+      class: 'water-day' + (day.met ? ' met' : '') + (day.iso === today ? ' today' : ''),
+      title: name + ': ' + day.glasses + ' of ' + day.goal + ' glasses',
+    }, track, el('span', { class: 'water-day-count', text: String(day.glasses) }), el('span', { class: 'water-day-name', text: name }));
+  }));
+  const metDays = week.filter((day) => day.met).length;
+  $('#waterWeekNote').textContent = 'Goal reached on ' + metDays + ' of the last 7 days. Solid bars mean the goal was met.';
 }
 
 // Shows `glasses` filled drops and the count, without saving (used while dragging).
@@ -56,7 +83,11 @@ function showGlasses(glasses) {
     drop.classList.toggle('filled', index < glasses);
     drop.setAttribute('aria-pressed', String(index < glasses));
   });
+  const summary = hydrationSummary(glasses, hydration.goal);
   $('#hydrationText').textContent = glasses + ' of ' + hydration.goal + ' glasses';
+  $('#hydrationDetail').textContent = summary.ounces + ' of ' + summary.goalOunces + ' oz \u00b7 ' + summary.message;
+  $('#waterBar').style.setProperty('--pct', summary.percent + '%');
+  $('#waterBar').setAttribute('aria-valuenow', String(summary.percent));
   setFoldSummary('hydration', glasses + ' of ' + hydration.goal + ' glasses today');
 }
 

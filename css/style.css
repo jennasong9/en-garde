@@ -663,6 +663,26 @@ textarea { min-height: 76px; resize: vertical; }
 .drop svg { width: 100%; height: 100%; fill: var(--surface-2); stroke: var(--footwork); stroke-width: 1.5; }
 .drop.filled svg { fill: var(--footwork); }
 .hydration-text { margin: 8px 0 12px; font-weight: 500; color: var(--text); }
+.water-bar { height: 10px; margin-top: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.water-bar span { display: block; height: 100%; width: var(--pct, 0%); border-radius: 999px; background: var(--footwork); transition: width .2s ease; }
+.hydration-text { margin-bottom: 2px; }
+.hydration-detail { margin: 0 0 12px; font-size: 13px; color: var(--text-dim); }
+.water-week-title { margin: 14px 0 8px; font-size: 14px; }
+.water-week { display: flex; gap: 6px; align-items: flex-end; max-width: 420px; }
+.water-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--text-dim); }
+.water-day-track { position: relative; width: 100%; height: 56px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.water-day-fill { position: absolute; left: 0; right: 0; bottom: 0; height: var(--pct, 0%); background: color-mix(in srgb, var(--footwork) 60%, transparent); }
+.water-day.met .water-day-fill { background: var(--footwork); }
+.water-day.today .water-day-name { font-weight: 700; color: var(--text); }
+.water-day-count { font-weight: 600; color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .water-bar span { transition: none; } }
+.macro-day-bars { position: relative; display: flex; gap: 3px; align-items: flex-end; justify-content: center; width: 100%; height: 56px; border-radius: 6px; background: var(--surface-2); padding: 0 4px; box-sizing: border-box; }
+.macro-day-band { position: absolute; left: 0; right: 0; bottom: calc(90 / 125 * 100%); height: calc(20 / 125 * 100%); background: color-mix(in srgb, var(--sage) 30%, transparent); }
+.macro-mini { position: relative; flex: 1; max-width: 10px; height: var(--pct, 0%); border-radius: 3px 3px 0 0; opacity: .45; }
+.macro-mini.hit { opacity: 1; }
+.macro-mini.protein { background: var(--footwork); }
+.macro-mini.carb { background: var(--strength); }
+.macro-mini.fat { background: var(--bout); }
 .goal-field { max-width: 200px; }
 .meal-scroll { margin-top: 8px; }
 /* Four days on the first row (Mon to Thu), three on the second (Fri to Sun). */
