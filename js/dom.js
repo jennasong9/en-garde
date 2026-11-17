@@ -133,8 +133,20 @@ export function makeDraggable(element, handlers) {
       // The pointer may already be gone; the drag still works while it is over the element.
     }
   });
+  // Ends a drag that the browser never finished (the button was let go where this element could
+  // not hear it), so nothing is left half-dragged.
+  const abandon = () => {
+    const wasDragging = dragging;
+    stop();
+    if (wasDragging) handlers.cancel();
+  };
   element.addEventListener('pointermove', (event) => {
     if (!pressed) return;
+    // A mouse moving with no button held means the release was missed.
+    if (event.pointerType === 'mouse' && event.buttons === 0) {
+      abandon();
+      return;
+    }
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
     if (!dragging) {
@@ -153,11 +165,9 @@ export function makeDraggable(element, handlers) {
     stop();
     if (wasDragging) handlers.drop(event);
   });
-  element.addEventListener('pointercancel', () => {
-    const wasDragging = dragging;
-    stop();
-    if (wasDragging) handlers.cancel();
-  });
+  element.addEventListener('pointercancel', abandon);
+  element.addEventListener('lostpointercapture', abandon);
+  window.addEventListener('blur', abandon);
   // Once a finger is holding the element to drag it, the page must not scroll under it.
   element.addEventListener('touchmove', (event) => {
     if (dragging) event.preventDefault();

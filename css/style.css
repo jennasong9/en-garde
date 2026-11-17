@@ -725,7 +725,7 @@ textarea { min-height: 76px; resize: vertical; }
 .meal-meta { font-size: 12px; color: var(--sage-deep); font-weight: 500; }
 .meal-desc { font-size: 13px; color: var(--text-dim); overflow-wrap: anywhere; }
 .meal-day.drop-target { border-color: var(--sage-deep); background: var(--sage-soft); box-shadow: 0 0 0 2px var(--sage); }
-.meal-card.drag-source { opacity: .4; }
+.meal-card.drag-source, .journal-entry.drag-source { opacity: .4; }
 .drop-line { height: 4px; margin: -2px 0; border-radius: 2px; background: var(--sage-deep); pointer-events: none; }
 .drag-ghost { z-index: 1000; pointer-events: none; box-shadow: 0 10px 22px rgba(40, 53, 43, .3); opacity: .95; }
 .meal-main { cursor: grab; }

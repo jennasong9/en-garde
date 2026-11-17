@@ -79,6 +79,8 @@ function longDate(iso, withYear = false) {
 const HINT = 'One entry for each session, plus one general entry a day.';
 
 export function renderJournal() {
+  // A drag cut short by a redraw would leave its floating copy behind.
+  document.querySelectorAll('.drag-ghost').forEach((ghost) => ghost.remove());
   renderViewSwitch();
   renderFeelingFilters();
   $('#journalCalendar').hidden = view !== 'calendar';

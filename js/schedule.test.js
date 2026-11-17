@@ -35,6 +35,7 @@ import {
   toggleStep,
   validateStep,
 } from './sessionsteps.js';
+import { makeDraggable } from './dom.js';
 import {
   dayLabel,
   hydrationReport,
@@ -533,6 +534,31 @@ test('reportAsText writes the week, each chosen section, and leaves out a sectio
   const waterOnly = reportAsText({ title: 'Weekly report', fencer: '', days: reportWeek, hydration, macros: null });
   equal(waterOnly.includes('MACRO TARGETS'), false);
   equal(waterOnly.includes('Fencer:'), false);
+});
+
+// Regression: a mouse release the page never heard about left the dragged copy of a Journal
+// entry stranded on top of the list, still "dragging".
+function dragCalls(events) {
+  const handle = document.createElement('button');
+  const calls = [];
+  makeDraggable(handle, { move: () => calls.push('move'), drop: () => calls.push('drop'), cancel: () => calls.push('cancel') });
+  for (const [type, buttons, y] of events) {
+    handle.dispatchEvent(new PointerEvent(type, { pointerId: 3, pointerType: 'mouse', button: 0, buttons, clientX: 0, clientY: y }));
+  }
+  return calls;
+}
+
+test('a drag ends with a drop when the mouse is released', () => {
+  equal(dragCalls([['pointerdown', 1, 0], ['pointermove', 1, 20], ['pointerup', 0, 20]]), ['move', 'drop']);
+});
+
+test('a drag is cancelled when the mouse moves with no button held, so nothing is left half-dragged', () => {
+  equal(dragCalls([['pointerdown', 1, 0], ['pointermove', 1, 20], ['pointermove', 0, 30]]), ['move', 'cancel']);
+  equal(dragCalls([['pointerdown', 1, 0], ['pointermove', 1, 20], ['pointermove', 0, 30], ['pointermove', 1, 40]]), ['move', 'cancel']);
+});
+
+test('a drag is cancelled when the browser loses the pointer', () => {
+  equal(dragCalls([['pointerdown', 1, 0], ['pointermove', 1, 20], ['lostpointercapture', 0, 20]]), ['move', 'cancel']);
 });
 
 test('hydrationSummary reports percent, glasses left, ounces and a message', () => {
