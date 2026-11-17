@@ -738,6 +738,29 @@
     </div>
   </dialog>
 
+  <dialog id="runDialog" class="run-dialog" aria-labelledby="runTitle">
+    <div class="dialog-head">
+      <h2 id="runTitle"></h2>
+      <button class="icon-btn" id="runClose" type="button" aria-label="Exit guided run">&#10005;</button>
+    </div>
+    <div class="run-progress"><span class="routine-bar" role="img" id="runBar"><span class="routine-bar-fill" id="runBarFill"></span></span><span id="runCounter" aria-live="polite"></span></div>
+    <h3 class="run-step-name" id="runStepName"></h3>
+    <p class="run-step-desc" id="runStepDesc"></p>
+    <button class="btn ghost small" id="runWatch" type="button" hidden>&#9654; Watch</button>
+    <div class="run-timer">
+      <div class="run-clock" id="runStepTime" role="timer" aria-label="Time on this step">0:00</div>
+      <div class="run-total" id="runTotalTime">Session total 0:00</div>
+      <div class="run-timer-buttons">
+        <button class="btn ghost" id="runPause" type="button">Pause</button>
+        <button class="btn ghost" id="runReset" type="button">Reset step</button>
+      </div>
+    </div>
+    <div class="run-nav">
+      <button class="btn ghost" id="runBack" type="button">Back</button>
+      <button class="btn" id="runNext" type="button">Next</button>
+    </div>
+  </dialog>
+
   <dialog id="videoDialog" class="video-dialog" aria-labelledby="videoTitle">
     <div class="dialog-head">
       <h2 id="videoTitle"></h2>

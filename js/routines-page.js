@@ -24,6 +24,7 @@ import { checkVideoFile, parseYouTubeLink, videoLabel, youtubeEmbedUrl, youtubeW
 import { deleteVideo, loadVideo, saveVideo } from './videostore.js';
 import { buildMenu } from './menu.js';
 import { setSwitchButtons } from './pill.js';
+import { firstUnfinishedIndex, formatClock, moveStep, stepCounter } from './runmode.js';
 import { hasReflection, writeReflection } from './journal-page.js';
 import { showToast } from './toast.js';
 import {
@@ -193,6 +194,13 @@ function sessionSection(session) {
   if (adding === session.id) section.append(stepForm(session, -1, { name: '', desc: '' }));
   else {
     section.append(el('div', { class: 'routine-section-actions' },
+      ...(steps.length > 0 ? [el('button', {
+        class: 'btn small',
+        type: 'button',
+        text: '\u25b6 Start guided run',
+        'aria-label': 'Start a guided run of this ' + info.short + ' session',
+        onclick: () => startRun(session),
+      })] : []),
       el('button', {
         class: 'btn ghost small',
         type: 'button',
@@ -233,6 +241,19 @@ function noStepsSection(session) {
     head, el('div', { class: 'routine-section-actions' }, reflectionButton(session)));
 }
 
+// Ticks (or unticks) one step of a session and tells the Schedule when that finishes or unfinishes
+// the session. Returns the progress before and after.
+function toggleTick(session, step) {
+  const before = sessionProgress(stepsOf(session.id), ticks[session.id] || []);
+  ticks = { ...ticks, [session.id]: toggleStep(ticks[session.id] || [], step) };
+  persistTicks();
+  const after = sessionProgress(stepsOf(session.id), ticks[session.id]);
+  const done = doneAfterTick(before, after);
+  // The Schedule owns the Done box, so ask it to change (it saves before this screen redraws).
+  if (done !== null) document.dispatchEvent(new CustomEvent('session-done-change', { detail: { id: session.id, done } }));
+  return { before, after };
+}
+
 function stepRow(session, step, index, isDone) {
   if (editing && editing.id === session.id && editing.index === index) {
     return el('li', {}, stepForm(session, index, step));
@@ -240,14 +261,8 @@ function stepRow(session, step, index, isDone) {
   const box = el('input', { type: 'checkbox', 'aria-label': step.name });
   box.checked = isDone;
   box.addEventListener('change', () => {
-    const before = sessionProgress(stepsOf(session.id), ticks[session.id] || []);
     const spot = box.getBoundingClientRect();
-    ticks = { ...ticks, [session.id]: toggleStep(ticks[session.id] || [], step) };
-    persistTicks();
-    const after = sessionProgress(stepsOf(session.id), ticks[session.id]);
-    const done = doneAfterTick(before, after);
-    // The Schedule owns the Done box, so ask it to change (it saves before this screen redraws).
-    if (done !== null) document.dispatchEvent(new CustomEvent('session-done-change', { detail: { id: session.id, done } }));
+    const { before, after } = toggleTick(session, step);
     renderRoutines();
     document.querySelector('[data-session="' + session.id + '"] li:nth-child(' + (index + 1) + ') input')?.focus();
     if (finishedSession(before, after)) burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
@@ -788,3 +803,111 @@ function renderUseRoutineList() {
 
 closeOnBackdropClick(useRoutineDialog);
 $('#useRoutineClose').addEventListener('click', () => useRoutineDialog.close());
+
+// ---------- guided run: one step at a time, with a timer ----------
+const runDialog = $('#runDialog');
+// The run in progress: its session, the step shown, and the time on that step and in all
+// (milliseconds, counted only while the timer is not paused).
+let run = null;
+let runClock = null;
+let screenLock = null;
+
+function startRun(session) {
+  const steps = stepsOf(session.id);
+  if (steps.length === 0) return;
+  const index = firstUnfinishedIndex(stepsDone(steps, ticks[session.id] || []));
+  run = { session, index, stepMs: 0, totalMs: 0, paused: false, lastTick: Date.now() };
+  $('#runTitle').textContent = SESSION_TYPES[session.type].short + ' guided run';
+  renderRun();
+  showDialog(runDialog);
+  runClock = setInterval(tickRun, 250);
+  // Keep a phone's screen awake while it sits on the floor during practice (not every browser can).
+  navigator.wakeLock?.request('screen').then((lock) => { screenLock = lock; }).catch(() => {});
+}
+
+function tickRun() {
+  const now = Date.now();
+  if (!run.paused) {
+    run.stepMs += now - run.lastTick;
+    run.totalMs += now - run.lastTick;
+  }
+  run.lastTick = now;
+  showRunTimes();
+}
+
+function showRunTimes() {
+  $('#runStepTime').textContent = formatClock(run.stepMs);
+  $('#runTotalTime').textContent = 'Session total ' + formatClock(run.totalMs);
+}
+
+function renderRun() {
+  const steps = stepsOf(run.session.id);
+  const step = steps[run.index];
+  $('#runCounter').textContent = stepCounter(run.index, steps.length);
+  $('#runBar').setAttribute('aria-label', stepCounter(run.index, steps.length));
+  $('#runBarFill').style.width = Math.round((run.index / steps.length) * 100) + '%';
+  $('#runStepName').textContent = step.name;
+  $('#runStepDesc').textContent = step.desc;
+  $('#runStepDesc').hidden = !step.desc;
+  $('#runWatch').hidden = !step.video;
+  $('#runBack').disabled = run.index === 0;
+  $('#runNext').textContent = run.index === steps.length - 1 ? 'Finish' : 'Next';
+  $('#runPause').textContent = run.paused ? 'Resume' : 'Pause';
+  showRunTimes();
+}
+
+// Moves to another step and restarts that step's time. Next ticks the step just done.
+function moveRun(direction) {
+  const steps = stepsOf(run.session.id);
+  const step = steps[run.index];
+  let finishedNow = false;
+  let spot = null;
+  if (direction > 0 && !stepsDone(steps, ticks[run.session.id] || [])[run.index]) {
+    spot = $('#runNext').getBoundingClientRect();
+    const { before, after } = toggleTick(run.session, step);
+    finishedNow = finishedSession(before, after);
+  }
+  const move = moveStep(run.index, steps.length, direction);
+  if (move.finished) {
+    const total = formatClock(run.totalMs);
+    closeRun();
+    renderRoutines();
+    if (finishedNow && spot) burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
+    showToast('Finished the ' + SESSION_TYPES[run.session.type].short + ' session in ' + total + '.');
+    return;
+  }
+  run.index = move.index;
+  run.stepMs = 0;
+  run.lastTick = Date.now();
+  renderRun();
+}
+
+// Stops the timer. Steps already ticked stay ticked.
+function closeRun() {
+  clearInterval(runClock);
+  runClock = null;
+  screenLock?.release().catch(() => {});
+  screenLock = null;
+  if (runDialog.open) runDialog.close();
+}
+
+$('#runNext').addEventListener('click', () => moveRun(1));
+$('#runBack').addEventListener('click', () => moveRun(-1));
+$('#runPause').addEventListener('click', () => {
+  tickRun();
+  run.paused = !run.paused;
+  $('#runPause').textContent = run.paused ? 'Resume' : 'Pause';
+});
+$('#runReset').addEventListener('click', () => {
+  run.stepMs = 0;
+  run.lastTick = Date.now();
+  showRunTimes();
+});
+$('#runWatch').addEventListener('click', () => openVideo(stepsOf(run.session.id)[run.index]));
+$('#runClose').addEventListener('click', () => { closeRun(); renderRoutines(); });
+runDialog.addEventListener('cancel', () => { closeRun(); renderRoutines(); });
+runDialog.addEventListener('keydown', (event) => {
+  if (event.target.closest('input, textarea, iframe')) return;
+  if (event.key === 'ArrowRight') moveRun(1);
+  if (event.key === 'ArrowLeft' && run.index > 0) moveRun(-1);
+});

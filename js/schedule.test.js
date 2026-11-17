@@ -16,6 +16,7 @@ import {
   renameRoutine,
   upcomingSessionsOfType,
 } from './routinelibrary.js';
+import { firstUnfinishedIndex, formatClock, moveStep, stepCounter } from './runmode.js';
 import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import {
@@ -1866,6 +1867,30 @@ test('a saved routine can be loaded into the next sessions of its type, soonest 
   equal(upcomingSessionsOfType(sessions, 'footwork', '2026-11-17').map((session) => session.id), ['e', 'c', 'a']);
   equal(upcomingSessionsOfType(sessions, 'footwork', '2026-11-17', 2).map((session) => session.id), ['e', 'c']);
   equal(upcomingSessionsOfType(sessions, 'bout', '2026-11-17'), []);
+});
+
+test('a guided run opens on the first step not yet ticked, or the first step when all are ticked', () => {
+  equal(firstUnfinishedIndex([true, true, false, false]), 2);
+  equal(firstUnfinishedIndex([false, true]), 0);
+  equal(firstUnfinishedIndex([true, true]), 0);
+  equal(firstUnfinishedIndex([]), 0);
+});
+
+test('the run timer shows minutes and seconds, and hours once past one hour', () => {
+  equal(formatClock(0), '0:00');
+  equal(formatClock(999), '0:00');
+  equal(formatClock(65000), '1:05');
+  equal(formatClock(3600000), '1:00:00');
+  equal(formatClock(3725000), '1:02:05');
+  equal(formatClock(-5), '0:00');
+});
+
+test('Back stops at the first step and Next on the last step finishes the run', () => {
+  equal(moveStep(2, 4, 1), { index: 3, finished: false });
+  equal(moveStep(3, 4, 1), { index: 3, finished: true });
+  equal(moveStep(0, 4, -1), { index: 0, finished: false });
+  equal(moveStep(2, 4, -1), { index: 1, finished: false });
+  equal(stepCounter(1, 4), 'Step 2 of 4');
 });
 
 const failures = results.filter((r) => r.error);

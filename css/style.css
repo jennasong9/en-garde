@@ -1026,3 +1026,16 @@ form h3 { font-size: 17px; }
 .saved-steps ol { margin: 6px 0 4px; padding-left: 22px; display: flex; flex-direction: column; gap: 4px; }
 .saved-rename { display: flex; flex-direction: column; gap: 8px; flex: 1 1 240px; }
 .saved-rename .form-error:empty { display: none; }
+
+/* Guided run: one step at a time, big text, a timer, Back and Next */
+.run-dialog { width: min(560px, calc(100% - 24px)); }
+.run-progress { display: flex; align-items: center; gap: 12px; margin: 4px 0 16px; font-size: 14px; color: var(--text-dim); white-space: nowrap; }
+.run-step-name { font-size: 28px; line-height: 1.2; margin: 0 0 8px; }
+.run-step-desc { font-size: 18px; line-height: 1.45; margin: 0 0 12px; }
+.run-timer { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 20px 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); }
+.run-clock { font-size: 56px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.run-total { font-size: 14px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.run-timer-buttons { display: flex; gap: 8px; margin-top: 6px; }
+.run-nav { display: flex; gap: 12px; }
+.run-nav .btn { flex: 1; min-height: 52px; font-size: 18px; }
+@media (max-width: 480px) { .run-step-name { font-size: 24px; } .run-clock { font-size: 48px; } }
