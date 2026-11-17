@@ -63,7 +63,11 @@ function printSheet(meals, { targets, glassGoal }) {
 }
 
 function print(meals, extras) {
-  const sheet = printSheet(meals, extras);
+  printSheetElement(printSheet(meals, extras));
+}
+
+// Sends a sheet to the browser's print window, hiding the rest of the page while it prints.
+export function printSheetElement(sheet) {
   document.body.append(sheet);
   document.body.classList.add('printing-plan');
   window.addEventListener('afterprint', () => {
@@ -73,7 +77,7 @@ function print(meals, extras) {
   window.print();
 }
 
-function download(content, type, filename) {
+export function download(content, type, filename) {
   const link = el('a', { href: URL.createObjectURL(new Blob([content], { type })), download: filename });
   document.body.append(link);
   link.click();

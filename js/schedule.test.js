@@ -35,6 +35,14 @@ import {
   toggleStep,
   validateStep,
 } from './sessionsteps.js';
+import {
+  dayLabel,
+  hydrationReport,
+  macroReport,
+  reportAsText,
+  reportDays,
+  weekLabel,
+} from './reportexport.js';
 import { archiveClearDate, archiveWarnings, archivedGoals, boardGoals, canArchive, dueStatus, expiredArchivedGoals, isUrgent, matchesTag, normalizeArchiveClearDays, normalizeCardSize, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
 import { renderFocusStrip } from './focus-strip.js';
 import { planAsSheet, planAsText, planDays } from './mealexport.js';
@@ -477,6 +485,54 @@ test('archiveWarnings lists goals clearing within 14 days, soonest first, with t
 test('normalizeArchiveClearDays keeps the four choices and falls back to 90 days', () => {
   equal([30, 90, 365, 0].map(normalizeArchiveClearDays), [30, 90, 365, 0]);
   equal([null, 45, '30', undefined].map(normalizeArchiveClearDays), [90, 90, 90, 90]);
+});
+
+const reportWeek = reportDays('2026-11-16');
+
+test('the report week is Monday to Sunday, labelled with day and date', () => {
+  equal(reportWeek[0], '2026-11-16');
+  equal(reportWeek[6], '2026-11-22');
+  equal(dayLabel('2026-11-16'), 'Mon Nov 16');
+  equal(weekLabel(reportWeek), 'Nov 16 to Nov 22, 2026');
+});
+
+test('hydrationReport marks future days, days with nothing saved, and counts days the goal was met', () => {
+  const log = { '2026-11-16': { glasses: 8, goal: 8 }, '2026-11-18': { glasses: 3, goal: 8 } };
+  const report = hydrationReport(log, reportWeek, '2026-11-19', 8);
+  equal(report.rows.map((row) => row.state), ['logged', 'nodata', 'logged', 'logged', 'future', 'future', 'future']);
+  equal(report.rows[3], { iso: '2026-11-19', state: 'logged', glasses: 0, goal: 8, ounces: 0, met: false });
+  equal(report.rows[0].met, true);
+  equal([report.recordedDays, report.metDays, report.totalGlasses], [3, 1, 11]);
+});
+
+test('macroReport lists grams against targets and counts days every macro was hit', () => {
+  const targets = { protein: 100, carb: 200, fat: null };
+  const log = {
+    '2026-11-16': { protein: 100, carb: 200, fat: 0, targets },
+    '2026-11-17': { protein: 50, carb: 200, fat: 0, targets },
+    '2026-11-18': { protein: 10, carb: 10, fat: 10, targets: { protein: null, carb: null, fat: null } },
+  };
+  const report = macroReport(log, reportWeek, '2026-11-19');
+  equal(report.rows.map((row) => row.state), ['logged', 'logged', 'nodata', 'nodata', 'future', 'future', 'future']);
+  equal(report.rows[0].macros, [{ macro: 'protein', grams: 100, target: 100, percent: 100, hit: true }, { macro: 'carb', grams: 200, target: 200, percent: 100, hit: true }]);
+  equal([report.recordedDays, report.hitDays], [2, 1]);
+});
+
+test('reportAsText writes the week, each chosen section, and leaves out a section not chosen', () => {
+  const hydration = hydrationReport({ '2026-11-16': { glasses: 8, goal: 8 } }, reportWeek, '2026-11-17', 8);
+  const macros = macroReport({}, reportWeek, '2026-11-17');
+  const both = reportAsText({ title: 'Weekly report', fencer: 'Test', days: reportWeek, hydration, macros });
+  equal(both.includes('Week of Nov 16 to Nov 22, 2026'), true);
+  equal(both.includes('Fencer: Test'), true);
+  equal(both.includes('Mon Nov 16: 8 of 8 glasses (64 oz), goal reached'), true);
+  equal(both.includes('Tue Nov 17: 0 of 8 glasses (0 oz)'), true);
+  equal(both.includes('Wed Nov 18: not yet'), true);
+  equal(both.includes('Goal reached on 1 of 2 recorded days. Total: 8 glasses (64 oz).'), true);
+  equal(both.includes('MACRO TARGETS'), true);
+  equal(both.includes('No days recorded this week.'), true);
+  const waterOnly = reportAsText({ title: 'Weekly report', fencer: '', days: reportWeek, hydration, macros: null });
+  equal(waterOnly.includes('MACRO TARGETS'), false);
+  equal(waterOnly.includes('Fencer:'), false);
 });
 
 test('hydrationSummary reports percent, glasses left, ounces and a message', () => {

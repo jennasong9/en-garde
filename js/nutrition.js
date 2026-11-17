@@ -42,6 +42,8 @@ import {
 import { addDays, makeId, formatTime, parseIso, toIso } from './schedule.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import { initExportPlan } from './export-plan.js';
+import { initExportReport } from './export-report.js';
+import { showToast } from './toast.js';
 import { buildMenu, setupMenu } from './menu.js';
 import { renderTodayTray } from './today-tray.js';
 import { loadJson, saveJson } from './storage.js';
@@ -752,6 +754,7 @@ $('#savePlanForm').addEventListener('submit', (event) => {
 });
 
 initExportPlan(() => meals, showMealStatus);
+initExportReport((message) => showToast(message));
 setupMenu($('#planMenu'));
 
 $('#loadPlanBtn').addEventListener('click', () => {
