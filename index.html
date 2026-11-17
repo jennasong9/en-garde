@@ -206,7 +206,15 @@
         <button class="meal-day-toggle archive-toggle" id="goalArchiveToggle" type="button" aria-expanded="false">
           <span id="goalArchiveSummary">Archive</span><span class="chevron" aria-hidden="true"></span>
         </button>
-        <div class="fold"><div class="fold-inner"><div class="archive-list" id="archiveList"></div></div></div>
+        <div class="fold"><div class="fold-inner">
+          <label class="field archive-clear">Clear archived goals after
+            <select id="archiveClearAfter"></select>
+          </label>
+          <p class="hydration-detail" id="archiveClearNote"></p>
+          <div id="archiveWarning" aria-live="polite"></div>
+          <p class="hydration-detail" id="archiveCleared" role="status"></p>
+          <div class="archive-list" id="archiveList"></div>
+        </div></div>
       </section>
     </section>
 

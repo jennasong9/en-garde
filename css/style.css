@@ -307,6 +307,8 @@ textarea { min-height: 76px; resize: vertical; }
   border-radius: var(--radius-s);
   border-left: 5px solid var(--c, var(--sage));
 }
+.next-open { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: center; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.next-item:hover { background: var(--sage-soft); }
 .next-when { font-weight: 700; min-width: 92px; }
 .next-time { color: var(--text-dim); font-size: 13px; }
 .next-what { flex: 1; min-width: 0; }
@@ -588,6 +590,8 @@ textarea { min-height: 76px; resize: vertical; }
 .collapsed > .fold > .fold-inner { visibility: hidden; padding-top: 0; padding-bottom: 0; margin-bottom: 0; transition: visibility 0s .28s, padding .28s ease, margin .28s ease; }
 .goal-archive { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 14px; }
 .archive-toggle { min-height: 36px; font-weight: 600; }
+.archive-clear { max-width: 220px; }
+.archive-warning { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: var(--sage-soft); color: var(--text); font-size: 13px; }
 .archive-list { display: flex; flex-direction: column; gap: 8px; }
 .archive-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
 .archive-info { flex: 1; min-width: 160px; }
@@ -853,6 +857,7 @@ form h3 { font-size: 17px; }
   .tg-anytime-cell .chip-text { display: block; }
   .more { font-size: 10px; }
   .next-item { flex-wrap: wrap; }
+  .next-open { flex-basis: 100%; }
   .next-when { min-width: 0; }
   .field-row { flex-direction: column; }
 }

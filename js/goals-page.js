@@ -5,14 +5,18 @@ import { $, el, formState, protectUnsavedChanges } from './dom.js';
 import { setFolded } from './fold.js';
 import {
   CARD_SIZES,
+  ARCHIVE_CLEAR_CHOICES,
   PROGRESS_STEPS,
   TAGS,
+  archiveWarnings,
   archivedGoals,
   boardGoals,
   canArchive,
   dueStatus,
+  expiredArchivedGoals,
   isUrgent,
   matchesTag,
+  normalizeArchiveClearDays,
   normalizeCardSize,
   stepFromPosition,
   tapStep,
@@ -41,6 +45,34 @@ const openedNames = new Set();
 function persist() {
   saveJson('goals', goals);
 }
+
+// Archived goals are cleared after a time the user picks. The grace start is the day this first
+// ran, so goals already archived are not cleared at once (see ARCHIVE_GRACE_DAYS).
+let archiveClearDays = normalizeArchiveClearDays(loadJson('archiveClearDays', null));
+let archiveGraceStart = loadJson('archiveGraceStart', '');
+if (!/^\d{4}-\d{2}-\d{2}$/.test(archiveGraceStart)) {
+  archiveGraceStart = toIso(new Date());
+  saveJson('archiveGraceStart', archiveGraceStart);
+}
+// What the last clearing removed, shown once in the Archive so it does not happen silently.
+let clearedNote = '';
+
+// Removes archived goals that are past their clear date. Returns true when any were removed.
+function clearOldArchivedGoals() {
+  const expired = expiredArchivedGoals(goals, archiveClearDays, archiveGraceStart, toIso(new Date()));
+  if (expired.length === 0) return false;
+  const ids = new Set(expired.map((goal) => goal.id));
+  goals = goals.filter((goal) => !ids.has(goal.id));
+  persist();
+  clearedNote = 'Cleared from the Archive: ' + expired.map((goal) => goal.name).join(', ') + '.';
+  return true;
+}
+clearOldArchivedGoals();
+
+// A new day may begin while the page sits open in a tab.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && clearOldArchivedGoals()) renderGoals();
+});
 
 // The deadline line as a plain lead-in and a tail that turns red when the deadline is close.
 function dueText(goal) {
@@ -383,10 +415,31 @@ function restoreGoal(goal) {
   renderGoals();
 }
 
+const archiveClearSelect = $('#archiveClearAfter');
+archiveClearSelect.replaceChildren(...ARCHIVE_CLEAR_CHOICES.map((choice) => el('option', { value: String(choice.days), text: choice.label })));
+archiveClearSelect.addEventListener('change', () => {
+  archiveClearDays = normalizeArchiveClearDays(Number(archiveClearSelect.value));
+  saveJson('archiveClearDays', archiveClearDays);
+  clearedNote = '';
+  clearOldArchivedGoals();
+  renderGoals();
+});
+
 function renderArchive() {
   const archived = archivedGoals(goals);
-  $('#goalArchive').hidden = archived.length === 0 && goals.length === 0;
-  $('#goalArchiveSummary').textContent = 'Archive (' + archived.length + ')';
+  const warnings = archiveWarnings(goals, archiveClearDays, archiveGraceStart, toIso(new Date()));
+  $('#goalArchive').hidden = archived.length === 0 && goals.length === 0 && clearedNote === '';
+  $('#goalArchiveSummary').textContent = 'Archive (' + archived.length + ')' + (warnings.length > 0 ? ' · ' + warnings.length + ' clearing soon' : '');
+  archiveClearSelect.value = String(archiveClearDays);
+  $('#archiveClearNote').textContent = archiveClearDays === 0
+    ? 'Archived goals stay until you delete them.'
+    : 'Archived goals are deleted for good this long after you archive them.';
+  $('#archiveWarning').replaceChildren(...warnings.map(({ goal, date, daysLeft }) => el('p', {
+    class: 'archive-warning',
+    text: goal.name + ' will be cleared on ' + parseIso(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      + ' (' + (daysLeft === 1 ? 'tomorrow' : 'in ' + daysLeft + ' days') + '). Tap Restore to keep it.',
+  })));
+  $('#archiveCleared').textContent = clearedNote;
   const list = $('#archiveList');
   if (archived.length === 0) {
     list.replaceChildren(el('p', { class: 'empty', text: 'Nothing archived yet. Finish a goal, then tap "Archive" on its card.' }));

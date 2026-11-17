@@ -1,4 +1,5 @@
 // Pure goal logic: no DOM, no storage, so it can be tested on its own.
+import { addDays, parseIso } from './schedule.js';
 
 export const TAGS = {
   technique: { label: 'Technique' },
@@ -61,6 +62,53 @@ export function archivedGoals(goals) {
   return goals
     .filter((goal) => goal.archived)
     .sort((a, b) => (b.archivedOn || '').localeCompare(a.archivedOn || ''));
+}
+
+// ---------- clearing the archive after a while ----------
+// How long an archived goal stays before it is cleared: 0 means never.
+export const ARCHIVE_CLEAR_CHOICES = [
+  { days: 30, label: '30 days' },
+  { days: 90, label: '90 days' },
+  { days: 365, label: '1 year' },
+  { days: 0, label: 'Never' },
+];
+export const DEFAULT_ARCHIVE_CLEAR_DAYS = 90;
+// Goals already in the archive when this began get this many days before the first clearing, so
+// nothing old vanishes the moment the setting appears.
+export const ARCHIVE_GRACE_DAYS = 14;
+// Goals are warned about this many days before they are cleared.
+export const ARCHIVE_WARNING_DAYS = 14;
+
+export function normalizeArchiveClearDays(value) {
+  return ARCHIVE_CLEAR_CHOICES.some((choice) => choice.days === value) ? value : DEFAULT_ARCHIVE_CLEAR_DAYS;
+}
+
+// The date an archived goal is cleared: `days` after it was archived, but not before the grace
+// period ends. Null when it never is (setting is Never, or the goal has no archive date).
+export function archiveClearDate(goal, days, graceStartIso) {
+  if (days === 0 || !goal.archivedOn) return null;
+  const due = addDays(goal.archivedOn, days);
+  const earliest = addDays(graceStartIso, ARCHIVE_GRACE_DAYS);
+  return due > earliest ? due : earliest;
+}
+
+// Archived goals whose clear date is today or earlier.
+export function expiredArchivedGoals(goals, days, graceStartIso, todayIso) {
+  return archivedGoals(goals).filter((goal) => {
+    const date = archiveClearDate(goal, days, graceStartIso);
+    return date !== null && date <= todayIso;
+  });
+}
+
+// Archived goals that will be cleared within the warning period, soonest first, each with its
+// clear date and the whole days left.
+export function archiveWarnings(goals, days, graceStartIso, todayIso) {
+  const limit = addDays(todayIso, ARCHIVE_WARNING_DAYS);
+  return archivedGoals(goals)
+    .map((goal) => ({ goal, date: archiveClearDate(goal, days, graceStartIso) }))
+    .filter(({ date }) => date !== null && date > todayIso && date <= limit)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ goal, date }) => ({ goal, date, daysLeft: Math.round((parseIso(date) - parseIso(todayIso)) / 86400000) }));
 }
 
 // An empty filter set means "show every tag".

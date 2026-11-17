@@ -35,7 +35,7 @@ import {
   toggleStep,
   validateStep,
 } from './sessionsteps.js';
-import { archivedGoals, boardGoals, canArchive, dueStatus, isUrgent, matchesTag, normalizeCardSize, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
+import { archiveClearDate, archiveWarnings, archivedGoals, boardGoals, canArchive, dueStatus, expiredArchivedGoals, isUrgent, matchesTag, normalizeArchiveClearDays, normalizeCardSize, sortGoals, stepFromPosition, tapStep, validateGoal, visibleGoals } from './goals.js';
 import { renderFocusStrip } from './focus-strip.js';
 import { planAsSheet, planAsText, planDays } from './mealexport.js';
 import { DEFAULT_REMINDERS, dueMeals, mealReminderText, normalizeReminders, normalizeSent, waterDue, waterReminderText } from './reminders.js';
@@ -449,6 +449,34 @@ test('clearPrepped unticks every meal and changes nothing else', () => {
   const plan = [{ id: 'a', day: 1, name: 'Oats', prepped: true }, { id: 'b', day: 2, name: 'Rice', prepped: false }];
   equal(clearPrepped(plan), [{ id: 'a', day: 1, name: 'Oats', prepped: false }, { id: 'b', day: 2, name: 'Rice', prepped: false }]);
   equal(plan[0].prepped, true);
+});
+
+const oldGoal = (id, archivedOn) => ({ id, name: 'Goal ' + id, tag: 'technique', progress: 100, archived: true, archivedOn });
+
+test('an archived goal is cleared after the chosen days, but never before the grace period ends', () => {
+  equal(archiveClearDate(oldGoal('a', '2026-01-01'), 90, '2026-01-01'), '2026-04-01');
+  equal(archiveClearDate(oldGoal('a', '2026-01-01'), 90, '2026-11-16'), '2026-11-30');
+  equal(archiveClearDate(oldGoal('a', '2026-01-01'), 0, '2026-01-01'), null);
+  equal(archiveClearDate({ id: 'b', archived: true }, 90, '2026-01-01'), null);
+});
+
+test('expiredArchivedGoals lists archived goals at or past their clear date, and leaves the rest', () => {
+  const goals = [oldGoal('a', '2026-01-01'), oldGoal('b', '2026-03-01'), { id: 'c', progress: 50 }, { id: 'd', archived: true }];
+  equal(expiredArchivedGoals(goals, 90, '2026-01-01', '2026-04-01').map((goal) => goal.id), ['a']);
+  equal(expiredArchivedGoals(goals, 90, '2026-01-01', '2026-05-30').map((goal) => goal.id), ['b', 'a']);
+  equal(expiredArchivedGoals(goals, 0, '2026-01-01', '2030-01-01'), []);
+});
+
+test('archiveWarnings lists goals clearing within 14 days, soonest first, with the days left', () => {
+  const goals = [oldGoal('a', '2026-01-10'), oldGoal('b', '2026-01-05'), oldGoal('c', '2026-03-01')];
+  const warnings = archiveWarnings(goals, 30, '2026-01-01', '2026-02-01');
+  equal(warnings.map((warning) => [warning.goal.id, warning.date, warning.daysLeft]), [['b', '2026-02-04', 3], ['a', '2026-02-09', 8]]);
+  equal(archiveWarnings(goals, 30, '2026-01-01', '2026-02-05').map((warning) => warning.goal.id), ['a']);
+});
+
+test('normalizeArchiveClearDays keeps the four choices and falls back to 90 days', () => {
+  equal([30, 90, 365, 0].map(normalizeArchiveClearDays), [30, 90, 365, 0]);
+  equal([null, 45, '30', undefined].map(normalizeArchiveClearDays), [90, 90, 90, 90]);
 });
 
 test('hydrationSummary reports percent, glasses left, ounces and a message', () => {

@@ -125,12 +125,27 @@ function renderNextUp() {
     const detail = [formatTime(session.time), session.mins ? session.mins + ' min' : ''].filter(Boolean).join(' · ');
     const what = el('div', { class: 'next-what' }, el('b', { text: SESSION_TYPES[session.type].label }));
     if (session.location) what.append(el('div', { class: 'next-where', text: session.location }));
-    list.append(
-      el('li', { class: 'next-item type-' + session.type },
-        el('div', {}, el('div', { class: 'next-when', text: describeDay(session.date) }),
-          el('div', { class: 'next-time', text: detail || 'All day' })),
-        what),
-    );
+    // Tapping the item opens its day; the routine button (for session types that have a routine)
+    // goes to the Routines page instead.
+    const open = el('button', {
+      class: 'next-open',
+      type: 'button',
+      'aria-label': 'Open ' + describeDay(session.date) + ', ' + SESSION_TYPES[session.type].label,
+      onclick: (event) => openDay(session.date, '', event.currentTarget),
+    }, el('div', {}, el('div', { class: 'next-when', text: describeDay(session.date) }),
+      el('div', { class: 'next-time', text: detail || 'All day' })),
+    what);
+    const item = el('li', { class: 'next-item type-' + session.type }, open);
+    if (SECTION_TYPES.includes(session.type)) {
+      item.append(el('button', {
+        class: 'btn ghost small',
+        type: 'button',
+        text: 'Open routine',
+        'aria-label': 'Open the routine for ' + describeDay(session.date) + ', ' + SESSION_TYPES[session.type].label,
+        onclick: () => openRoutine(session),
+      }));
+    }
+    list.append(item);
   }
 }
 
