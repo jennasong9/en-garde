@@ -1,6 +1,7 @@
 // Pure logic for saved routines: no DOM, no storage, so it can be tested on its own. A saved
 // routine is { id, name, savedAt, steps }, a copy of the steps of one session type. Each session
 // type keeps its own list of them, like saved meal plans.
+import { compareSessions } from './schedule.js';
 import { HIDDEN_DIRECTION_CHARS, STARTER_STEPS, SECTION_TYPES, cleanSteps, stepKey } from './sessionsteps.js';
 
 export const MAX_SAVED_ROUTINES = 20;
@@ -74,4 +75,33 @@ export function starterRoutines(makeId, savedAt) {
     result[type] = [{ id: makeId(), name: 'Starter ' + (type === 'blade' ? 'bladework' : type), savedAt, steps: cleanSteps(STARTER_STEPS[type]) }];
   }
   return result;
+}
+
+// Every saved routine, grouped by session type for the "Saved routines" screen: only types that
+// have at least one, in the order the types are listed, each with its routines newest first.
+export function routineGroups(saved) {
+  return SECTION_TYPES
+    .map((type) => ({ type, routines: [...(saved?.[type] ?? [])].sort((a, b) => b.savedAt.localeCompare(a.savedAt)) }))
+    .filter((group) => group.routines.length > 0);
+}
+
+export const savedRoutineCount = (saved) => SECTION_TYPES.reduce((sum, type) => sum + (saved?.[type]?.length ?? 0), 0);
+
+// The saved routines with one renamed. Returns { saved, error }: `error` says what is wrong with
+// the new name (and `saved` is unchanged), or is null. Keeping the same name, or only changing its
+// capital letters, is allowed.
+export function renameRoutine(saved, type, id, newName) {
+  const others = (saved[type] ?? []).filter((routine) => routine.id !== id);
+  const error = validateRoutineName(newName, others);
+  if (error) return { saved, error };
+  const routines = saved[type].map((routine) => (routine.id === id ? { ...routine, name: newName.trim() } : routine));
+  return { saved: { ...saved, [type]: routines }, error: null };
+}
+
+// The next sessions of a type, from `fromIso` on, soonest first: the places a saved routine can be loaded.
+export function upcomingSessionsOfType(sessions, type, fromIso, limit = 8) {
+  return sessions
+    .filter((session) => session.type === type && session.date >= fromIso)
+    .sort((a, b) => a.date.localeCompare(b.date) || compareSessions(a, b))
+    .slice(0, limit);
 }

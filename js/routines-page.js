@@ -23,16 +23,21 @@ import { loadJson, saveJson } from './storage.js';
 import { checkVideoFile, parseYouTubeLink, videoLabel, youtubeEmbedUrl, youtubeWatchUrl } from './stepvideo.js';
 import { deleteVideo, loadVideo, saveVideo } from './videostore.js';
 import { buildMenu } from './menu.js';
+import { setSwitchButtons } from './pill.js';
 import { hasReflection, writeReflection } from './journal-page.js';
 import { showToast } from './toast.js';
 import {
   cleanSavedRoutines,
   defaultRoutineName,
   routineHasStep,
+  renameRoutine,
+  routineGroups,
   routineSummary,
   routineWithoutStep,
+  savedRoutineCount,
   snapshotRoutine,
   starterRoutines,
+  upcomingSessionsOfType,
   validateRoutineName,
 } from './routinelibrary.js';
 
@@ -66,6 +71,9 @@ let adding = null;
 let editing = null;
 let confirmingRemove = null;
 let formError = '';
+
+// Which half of the page is open: 'day' (the sessions of one day) or 'saved' (every saved routine).
+let view = 'day';
 
 const currentDay = () => shownIso || toIso(new Date());
 
@@ -127,6 +135,13 @@ export function renderRoutines() {
     }
     stepsBySession = kept;
     persistSteps();
+  }
+
+  renderViewSwitch();
+  $('#routinesPage').classList.toggle('saved-view', view === 'saved');
+  if (view === 'saved') {
+    renderSavedRoutines();
+    return;
   }
 
   const dateText = parseIso(iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
@@ -526,6 +541,7 @@ $('#saveRoutineForm').addEventListener('submit', (event) => {
   persistRoutines();
   setSteps(librarySession.id, steps, routine.id);
   saveRoutineDialog.close();
+  renderRoutines();
   showToast('Saved "' + routine.name + '" (' + routineSummary(routine) + ').');
 });
 
@@ -589,6 +605,7 @@ function loadRoutine(routine) {
   confirmingRemove = null;
   confirmingRoutine = null;
   loadRoutineDialog.close();
+  useRoutineDialog.close();
   renderRoutines();
   showToast('Loaded "' + routine.name + '" (' + routineSummary(routine) + ').');
 }
@@ -599,6 +616,7 @@ function deleteRoutine(routine) {
   persistRoutines();
   confirmingRoutine = null;
   renderRoutineList();
+  renderRoutines();
 }
 
 const saveRoutineGuard = protectUnsavedChanges(saveRoutineDialog, () => formState($('#saveRoutineForm')));
@@ -606,3 +624,167 @@ $('#saveRoutineClose').addEventListener('click', () => saveRoutineDialog.close()
 $('#saveRoutineCancel').addEventListener('click', () => saveRoutineDialog.close());
 closeOnBackdropClick(loadRoutineDialog);
 $('#loadRoutineClose').addEventListener('click', () => loadRoutineDialog.close());
+
+// ---------- every saved routine in one place ----------
+const useRoutineDialog = $('#useRoutineDialog');
+// What is being done on the Saved routines screen: which routines have their steps showing, the
+// routine being renamed (with its error), and the one waiting for "Yes, delete".
+const openRoutineIds = new Set();
+let renamingRoutine = null;
+let renameError = '';
+let deletingRoutineId = null;
+// The routine whose "Use" pop-up is open, and the session waiting for "Yes, replace".
+let usingRoutine = null;
+let replacingSessionId = null;
+
+function renderViewSwitch() {
+  const names = { day: 'By day', saved: 'Saved routines (' + savedRoutineCount(savedRoutines) + ')' };
+  setSwitchButtons($('#routineViewSwitch'), Object.entries(names).map(([name, label]) => el('button', {
+    class: 'view-btn',
+    type: 'button',
+    text: label,
+    'aria-pressed': String(name === view),
+    onclick: () => {
+      view = name;
+      renamingRoutine = null;
+      deletingRoutineId = null;
+      renderRoutines();
+    },
+  })), '[aria-pressed="true"]');
+}
+
+function renderSavedRoutines() {
+  const total = savedRoutineCount(savedRoutines);
+  $('#routineSummary').textContent = total === 0 ? 'No saved routines yet' : total + (total === 1 ? ' saved routine' : ' saved routines');
+  const box = $('#savedRoutines');
+  if (total === 0) {
+    box.replaceChildren(el('div', { class: 'routine-empty' },
+      el('p', { class: 'empty', text: 'No saved routines yet. On a session, open "Saved routines" and choose "Save these steps as a routine" to keep one here.' }),
+      el('button', { class: 'btn ghost', type: 'button', text: 'Go to the sessions', onclick: () => { view = 'day'; renderRoutines(); } })));
+    return;
+  }
+  box.replaceChildren(...routineGroups(savedRoutines).map(({ type, routines }) => el('section', { class: 'routine-section type-' + type, 'aria-label': SESSION_TYPES[type].short + ' routines' },
+    el('div', { class: 'routine-section-head' },
+      el('h3', { text: SESSION_TYPES[type].short }),
+      el('span', { class: 'routine-section-meta', text: routines.length + (routines.length === 1 ? ' routine' : ' routines') })),
+    el('ul', { class: 'plan-list' }, ...routines.map((routine) => savedRoutineRow(type, routine))))));
+}
+
+function savedRoutineRow(type, routine) {
+  const saved = routine.savedAt ? new Date(routine.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const redraw = renderRoutines;
+  const steps = el('details', { class: 'saved-steps' },
+    el('summary', { text: 'See steps' }),
+    el('ol', {}, ...routine.steps.map((step) => el('li', {}, el('b', { text: step.name }), step.desc ? ' \u2014 ' + step.desc : ''))));
+  steps.open = openRoutineIds.has(routine.id);
+  steps.addEventListener('toggle', () => (steps.open ? openRoutineIds.add(routine.id) : openRoutineIds.delete(routine.id)));
+
+  const head = el('div', { class: 'plan-info' },
+    el('b', { text: routine.name }),
+    el('span', { text: (saved ? 'Saved ' + saved + ' \u00b7 ' : '') + routineSummary(routine) }));
+  const row = el('li', { class: 'plan-item saved-routine' }, head);
+
+  if (renamingRoutine && renamingRoutine.id === routine.id) {
+    const input = el('input', { type: 'text', maxlength: String(60), value: renamingRoutine.name, 'aria-label': 'New name for ' + routine.name });
+    const save = () => {
+      const result = renameRoutine(savedRoutines, type, routine.id, input.value);
+      if (result.error) {
+        renamingRoutine = { id: routine.id, name: input.value };
+        renameError = result.error;
+        redraw();
+        return;
+      }
+      savedRoutines = result.saved;
+      persistRoutines();
+      renamingRoutine = null;
+      redraw();
+      showToast('Renamed to "' + input.value.trim() + '".');
+    };
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') { event.preventDefault(); save(); }
+      if (event.key === 'Escape') { event.stopPropagation(); renamingRoutine = null; redraw(); }
+    });
+    row.append(el('div', { class: 'saved-rename' },
+      input,
+      el('div', { class: 'plan-buttons' },
+        el('button', { class: 'btn small', type: 'button', text: 'Save name', onclick: save }),
+        el('button', { class: 'btn ghost small', type: 'button', text: 'Cancel', onclick: () => { renamingRoutine = null; redraw(); } })),
+      el('p', { class: 'form-error', role: 'alert', text: renameError })));
+    queueMicrotask(() => { if (input.isConnected) { input.focus(); input.select(); } });
+  } else if (deletingRoutineId === routine.id) {
+    row.append(el('div', { class: 'plan-confirm' },
+      el('span', { text: 'Delete this routine?' }),
+      el('button', { class: 'btn danger small', type: 'button', text: 'Yes, delete', onclick: () => deleteSavedRoutine(type, routine) }),
+      el('button', { class: 'btn ghost small', type: 'button', text: 'Cancel', onclick: () => { deletingRoutineId = null; redraw(); } })));
+  } else {
+    row.append(el('div', { class: 'plan-buttons' },
+      el('button', { class: 'btn small', type: 'button', text: 'Use', 'aria-label': 'Use ' + routine.name + ' on a day', onclick: () => openUseRoutine(type, routine) }),
+      el('button', { class: 'btn ghost small', type: 'button', text: 'Rename', 'aria-label': 'Rename ' + routine.name, onclick: () => { renamingRoutine = { id: routine.id, name: routine.name }; renameError = ''; deletingRoutineId = null; redraw(); } }),
+      el('button', { class: 'btn danger small', type: 'button', text: 'Delete', 'aria-label': 'Delete ' + routine.name, onclick: () => { deletingRoutineId = routine.id; renamingRoutine = null; redraw(); } })));
+  }
+  row.append(steps);
+  return row;
+}
+
+function deleteSavedRoutine(type, routine) {
+  savedRoutines = { ...savedRoutines, [type]: savedRoutines[type].filter((other) => other.id !== routine.id) };
+  persistRoutines();
+  openRoutineIds.delete(routine.id);
+  deletingRoutineId = null;
+  renderRoutines();
+  showToast('Deleted "' + routine.name + '".');
+}
+
+// "Use": lists the next sessions of the routine's type so one can be picked to load it into.
+function openUseRoutine(type, routine) {
+  usingRoutine = { type, routine };
+  replacingSessionId = null;
+  $('#useRoutineTitle').textContent = 'Use "' + routine.name + '"';
+  renderUseRoutineList();
+  showDialog(useRoutineDialog);
+}
+
+function renderUseRoutineList() {
+  const { type, routine } = usingRoutine;
+  const sessions = upcomingSessionsOfType(allSessions(), type, toIso(new Date()));
+  $('#useRoutineHelp').hidden = sessions.length === 0;
+  const list = $('#useRoutineList');
+  if (sessions.length === 0) {
+    list.replaceChildren(el('li', { class: 'empty' },
+      'No upcoming ' + SESSION_TYPES[type].short + ' sessions. Add one on the Schedule first, then come back. ',
+      el('button', { class: 'btn ghost small', type: 'button', text: 'Go to Schedule', onclick: () => { useRoutineDialog.close(); location.hash = '#schedule'; } })));
+    return;
+  }
+  list.replaceChildren(...sessions.map((session) => {
+    const day = parseIso(session.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const when = [day, session.time ? formatTime(session.time) : 'All day', session.location].filter(Boolean).join(' \u00b7 ');
+    const hasSteps = stepsOf(session.id).length > 0;
+    const use = () => {
+      librarySession = session;
+      loadRoutine(routine);
+      view = 'day';
+      goToDay(session.date);
+    };
+    const row = el('li', { class: 'plan-item' }, el('div', { class: 'plan-info' },
+      el('b', { text: when }),
+      el('span', { text: hasSteps ? routineSummary({ steps: stepsOf(session.id) }) + ' now' : 'No steps yet' })));
+    if (replacingSessionId === session.id) {
+      row.append(el('div', { class: 'plan-confirm' },
+        el('span', { text: 'Replace its steps?' }),
+        el('button', { class: 'btn small', type: 'button', text: 'Yes, replace', onclick: use }),
+        el('button', { class: 'btn ghost small', type: 'button', text: 'Cancel', onclick: () => { replacingSessionId = null; renderUseRoutineList(); } })));
+    } else {
+      row.append(el('div', { class: 'plan-buttons' }, el('button', {
+        class: 'btn small',
+        type: 'button',
+        text: 'Load here',
+        'aria-label': 'Load into the session on ' + when,
+        onclick: hasSteps ? () => { replacingSessionId = session.id; renderUseRoutineList(); } : use,
+      })));
+    }
+    return row;
+  }));
+}
+
+closeOnBackdropClick(useRoutineDialog);
+$('#useRoutineClose').addEventListener('click', () => useRoutineDialog.close());

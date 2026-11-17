@@ -268,20 +268,22 @@
         <div>
           <div class="head-title"><h2>Routines</h2><button class="help-btn" type="button" data-help="routinesHelp" aria-expanded="false" aria-label="Tips for Routines">?</button></div>
           <p class="goal-summary" id="routineSummary"></p>
+          <div class="view-switch" id="routineViewSwitch" role="group" aria-label="Routines view"></div>
         </div>
-        <div class="calendar-nav">
+        <div class="calendar-nav" id="routineDayNav">
           <button class="btn ghost" id="routineToday" type="button">Today</button>
           <button class="icon-btn" id="routinePrev" type="button" aria-label="Previous day">&#8249;</button>
           <button class="icon-btn" id="routineNext" type="button" aria-label="Next day">&#8250;</button>
         </div>
       </div>
 <div class="focus-strip" id="routinesFocus" hidden></div>
-<div class="help-panel" id="routinesHelp"><ul><li>Tick steps off as you go</li><li>Steps belong to one session; save them as a routine to reuse</li></ul></div>
+<div class="help-panel" id="routinesHelp"><ul><li>Tick steps off as you go</li><li>Steps belong to one session; save them as a routine to reuse</li><li>"Saved routines" lists every routine you have saved</li></ul></div>
       <label class="switch-row routine-option" for="strikeToggle">
         <span>Strikethrough completed steps</span>
         <input type="checkbox" role="switch" id="strikeToggle" class="switch-toggle">
       </label>
       <div class="routine-sections" id="routineSections" aria-live="polite"></div>
+      <div class="saved-routines" id="savedRoutines" aria-live="polite"></div>
     </section>
 
     <div id="nutritionPage" hidden>
@@ -693,6 +695,15 @@
     </div>
     <p class="tracker-help" id="loadRoutineHelp">Loading a routine replaces the steps now in this session type. Save them first if you want to keep them.</p>
     <ul class="plan-list" id="routineList"></ul>
+  </dialog>
+
+  <dialog id="useRoutineDialog" aria-labelledby="useRoutineTitle">
+    <div class="dialog-head">
+      <h2 id="useRoutineTitle">Use routine</h2>
+      <button class="icon-btn" id="useRoutineClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p class="tracker-help" id="useRoutineHelp">Pick the session to load it into. Loading replaces the steps already in that session.</p>
+    <ul class="plan-list" id="useRoutineList"></ul>
   </dialog>
 
   <dialog id="copyDialog" aria-labelledby="copyTitle">

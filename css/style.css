@@ -1015,3 +1015,14 @@ form h3 { font-size: 17px; }
 .day-entry { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); color: var(--text); text-align: left; cursor: pointer; }
 .day-entry span { font-size: 13px; color: var(--text-dim); }
 .day-entry:hover { border-color: var(--sage); }
+
+/* Routines page: the "Saved routines" half (every saved routine, grouped by session type) */
+.saved-routines { display: none; }
+.saved-view .saved-routines { display: flex; flex-direction: column; gap: 16px; }
+.saved-view #routineSections, .saved-view #routineDayNav, .saved-view .routine-option, .saved-view #routinesFocus { display: none; }
+.saved-routine { align-items: flex-start; }
+.saved-steps { flex-basis: 100%; font-size: 14px; }
+.saved-steps summary { cursor: pointer; color: var(--text-dim); min-height: 32px; display: flex; align-items: center; }
+.saved-steps ol { margin: 6px 0 4px; padding-left: 22px; display: flex; flex-direction: column; gap: 4px; }
+.saved-rename { display: flex; flex-direction: column; gap: 8px; flex: 1 1 240px; }
+.saved-rename .form-error:empty { display: none; }

@@ -11,6 +11,10 @@ import {
   routineSummary,
   snapshotRoutine,
   validateRoutineName,
+  routineGroups,
+  savedRoutineCount,
+  renameRoutine,
+  upcomingSessionsOfType,
 } from './routinelibrary.js';
 import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
@@ -1821,6 +1825,47 @@ test('cleanDraft keeps what was typed on the welcome form and drops anything unu
   equal(draft, { name: 'Jenna', weapon: 'Foil', club: 'Point', rating: 'B26', trackerLink: '', theme: 'dark', font: 'mono', mealReminders: true, waterReminders: false });
   equal(cleanDraft({ name: 5, weapon: 'Axe', theme: 'neon', font: 'comic' }), { name: '', weapon: '', club: '', rating: '', trackerLink: '', theme: 'auto', font: 'sans', mealReminders: false, waterReminders: false });
   equal(cleanDraft(null), null);
+});
+
+const libraryFixture = () => ({
+  ...cleanSavedRoutines(null),
+  footwork: [{ id: 'f1', name: 'Quick feet', savedAt: '2026-11-01T00:00:00Z', steps: stepList('A') }, { id: 'f2', name: 'Long ladder', savedAt: '2026-11-10T00:00:00Z', steps: stepList('A', 'B') }],
+  blade: [{ id: 'b1', name: 'Parries', savedAt: '2026-11-05T00:00:00Z', steps: stepList('A') }],
+});
+
+test('the saved routines screen groups every routine by session type, newest first, and skips empty types', () => {
+  const groups = routineGroups(libraryFixture());
+  equal(groups.map((group) => group.type), ['footwork', 'blade']);
+  equal(groups[0].routines.map((routine) => routine.id), ['f2', 'f1']);
+  equal(savedRoutineCount(libraryFixture()), 3);
+  equal(routineGroups(cleanSavedRoutines(null)), []);
+  equal(savedRoutineCount(null), 0);
+});
+
+test('renaming a saved routine checks the new name and leaves the others alone', () => {
+  const saved = libraryFixture();
+  const renamed = renameRoutine(saved, 'footwork', 'f1', '  Speedy  ');
+  equal(renamed.error, null);
+  equal(renamed.saved.footwork.map((routine) => routine.name), ['Speedy', 'Long ladder']);
+  equal(renamed.saved.blade, saved.blade);
+  equal(renameRoutine(saved, 'footwork', 'f1', 'Quick feet').error, null);
+  equal(renameRoutine(saved, 'footwork', 'f1', 'QUICK FEET').error, null);
+  equal(renameRoutine(saved, 'footwork', 'f1', 'long ladder').error, 'You already have a routine with that name. Choose a different name.');
+  equal(renameRoutine(saved, 'footwork', 'f1', '   ').error, 'Give the routine a name.');
+  equal(renameRoutine(saved, 'footwork', 'f1', '   ').saved, saved);
+});
+
+test('a saved routine can be loaded into the next sessions of its type, soonest first', () => {
+  const sessions = [
+    { id: 'a', type: 'footwork', date: '2026-11-20', time: '18:00' },
+    { id: 'b', type: 'blade', date: '2026-11-18', time: '18:00' },
+    { id: 'c', type: 'footwork', date: '2026-11-17', time: '09:00' },
+    { id: 'd', type: 'footwork', date: '2026-11-16', time: '09:00' },
+    { id: 'e', type: 'footwork', date: '2026-11-17', time: '07:00' },
+  ];
+  equal(upcomingSessionsOfType(sessions, 'footwork', '2026-11-17').map((session) => session.id), ['e', 'c', 'a']);
+  equal(upcomingSessionsOfType(sessions, 'footwork', '2026-11-17', 2).map((session) => session.id), ['e', 'c']);
+  equal(upcomingSessionsOfType(sessions, 'bout', '2026-11-17'), []);
 });
 
 const failures = results.filter((r) => r.error);
