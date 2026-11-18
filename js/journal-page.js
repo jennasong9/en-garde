@@ -1,6 +1,7 @@
 import { setSwitchButtons } from './pill.js';
 import { showDialog } from './dialog-motion.js';
 import { renderFocusStrip } from './focus-strip.js';
+import { TREND_RANGES, renderTrends } from './journal-trends.js';
 import { pingToday } from './today-ping.js';
 import { $, closeOnBackdropClick, el, formState, makeDraggable, protectUnsavedChanges } from './dom.js';
 import {
@@ -30,6 +31,7 @@ let entries = normalizeEntries(loadJson('journal', {}));
 saveJson('journal', entries);
 
 let view = 'calendar';
+let trendDays = TREND_RANGES[0].days;
 // How the List view is ordered, and (for "Custom") the user's own order of the entries (their ids).
 const sort = normalizeSort(loadJson('journalSort', {}));
 const storedOrder = loadJson('journalOrder', []);
@@ -85,6 +87,8 @@ export function renderJournal() {
   renderFeelingFilters();
   $('#journalCalendar').hidden = view !== 'calendar';
   $('#journalList').hidden = view !== 'list';
+  $('#journalTrends').hidden = view !== 'trends';
+  $('#feelingFilters').hidden = view === 'trends';
   $('#journalNav').hidden = view !== 'calendar';
   $('#journalSort').hidden = view !== 'list';
   $('#sortBy').value = sort.by;
@@ -97,6 +101,10 @@ export function renderJournal() {
     $('#journalTitle').textContent = parseIso(anchorIso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     $('#journalHint').textContent = HINT;
     renderCalendar();
+  } else if (view === 'trends') {
+    $('#journalTitle').textContent = 'Trends';
+    $('#journalHint').textContent = 'How you felt in your entries over time.';
+    renderTrendsView();
   } else {
     $('#journalTitle').textContent = 'All entries';
     $('#journalHint').textContent = HINT;
@@ -114,7 +122,7 @@ function fillEntryText(box, entry) {
 }
 
 function renderViewSwitch() {
-  const names = { calendar: 'Calendar', list: 'List' };
+  const names = { calendar: 'Calendar', list: 'List', trends: 'Trends' };
   setSwitchButtons($('#journalViewSwitch'), Object.entries(names).map(([name, label]) => el('button', {
     class: 'view-btn',
     type: 'button',
@@ -125,6 +133,24 @@ function renderViewSwitch() {
       renderJournal();
     },
   })), '[aria-pressed="true"]');
+}
+
+function renderTrendsView() {
+  const box = $('#journalTrends');
+  const range = el('div', { class: 'view-switch', role: 'group', 'aria-label': 'Trend range' });
+  setSwitchButtons(range, TREND_RANGES.map(({ days, label }) => el('button', {
+    class: 'view-btn',
+    type: 'button',
+    text: label,
+    'aria-pressed': String(days === trendDays),
+    onclick: () => {
+      trendDays = days;
+      renderJournal();
+    },
+  })), '[aria-pressed="true"]');
+  const chart = el('div');
+  renderTrends(chart, entries, toIso(new Date()), trendDays);
+  box.replaceChildren(range, chart);
 }
 
 function renderFeelingFilters() {

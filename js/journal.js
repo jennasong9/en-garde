@@ -4,6 +4,7 @@
 // its sessions, plus one general entry. (Entries saved before this were keyed by their date, which
 // is why a date works as an id.)
 
+import { parseIso, toIso } from './schedule.js';
 import { normalizeVideo } from './stepvideo.js';
 import { cleanVideoNotes } from './video-review.js';
 
@@ -160,4 +161,37 @@ export function placeInCustomOrder(fullOrder, visibleOrder, date, index) {
   else if (index < visibleOthers.length) at = without.indexOf(visibleOthers[index]);
   else at = without.indexOf(visibleOthers[visibleOthers.length - 1]) + 1;
   return [...without.slice(0, at), date, ...without.slice(at)];
+}
+
+// How good a feeling is for the trends chart: Rough is lowest, Sharp is highest.
+export const FEELING_SCORES = { rough: 1, tired: 2, steady: 3, sharp: 4 };
+
+// One point for each day in the last `days` days (ending on `todayIso`) that has at least one entry
+// with a feeling: { date, score } where score is the average when a day has several entries.
+// Days without entries have no point, so a chart can leave a gap instead of inventing a value.
+export function feelingTrend(entries, todayIso, days) {
+  const first = parseIso(todayIso);
+  first.setDate(first.getDate() - (days - 1));
+  const firstIso = toIso(first);
+  const byDay = new Map();
+  for (const entry of asList(entries)) {
+    const score = FEELING_SCORES[entry.feeling];
+    if (score === undefined || entry.date < firstIso || entry.date > todayIso) continue;
+    byDay.set(entry.date, [...(byDay.get(entry.date) ?? []), score]);
+  }
+  return [...byDay.entries()]
+    .map(([date, scores]) => ({ date, score: scores.reduce((sum, value) => sum + value, 0) / scores.length }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// "up", "down" or "steady": the later half of the points compared with the earlier half. It needs
+// at least four points to say anything, and returns null before that.
+export function trendDirection(points) {
+  if (points.length < 4) return null;
+  const average = (list) => list.reduce((sum, point) => sum + point.score, 0) / list.length;
+  const half = Math.floor(points.length / 2);
+  const change = average(points.slice(points.length - half)) - average(points.slice(0, half));
+  if (change >= 0.3) return 'up';
+  if (change <= -0.3) return 'down';
+  return 'steady';
 }

@@ -54,7 +54,7 @@ import { renderFocusStrip } from './focus-strip.js';
 import { planAsSheet, planAsText, planDays } from './mealexport.js';
 import { DEFAULT_REMINDERS, dueMeals, mealReminderText, normalizeReminders, normalizeSent, waterDue, waterReminderText } from './reminders.js';
 import { crc32, sheetToXlsx, zipStored } from './xlsx.js';
-import { entriesOn, entryForSession, entryParts, feelingOf, freeSlots, latestFocus, matchesFeeling, normalizeEntries, normalizeSort, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
+import { FEELING_SCORES, feelingTrend, trendDirection, entriesOn, entryForSession, entryParts, feelingOf, freeSlots, latestFocus, matchesFeeling, normalizeEntries, normalizeSort, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import { isStrayClick } from './confirm.js';
 import {
   addTemplateToDays,
@@ -1891,6 +1891,36 @@ test('Back stops at the first step and Next on the last step finishes the run', 
   equal(moveStep(0, 4, -1), { index: 0, finished: false });
   equal(moveStep(2, 4, -1), { index: 1, finished: false });
   equal(stepCounter(1, 4), 'Step 2 of 4');
+});
+
+test('the feelings trend has one point per day, averaging a day with several entries', () => {
+  const entries = {
+    a: { date: '2026-11-10', feeling: 'sharp' },
+    b: { date: '2026-11-10', feeling: 'tired' },
+    c: { date: '2026-11-12', feeling: 'rough' },
+  };
+  equal(feelingTrend(entries, '2026-11-18', 30), [{ date: '2026-11-10', score: 3 }, { date: '2026-11-12', score: 1 }]);
+  equal(FEELING_SCORES.sharp > FEELING_SCORES.steady && FEELING_SCORES.steady > FEELING_SCORES.tired && FEELING_SCORES.tired > FEELING_SCORES.rough, true);
+});
+
+test('the feelings trend leaves out old days, future days and entries with no feeling', () => {
+  const entries = {
+    old: { date: '2026-09-01', feeling: 'sharp' },
+    edge: { date: '2026-10-20', feeling: 'steady' },
+    none: { date: '2026-11-05', feeling: '' },
+    later: { date: '2026-11-19', feeling: 'sharp' },
+  };
+  equal(feelingTrend(entries, '2026-11-18', 30), [{ date: '2026-10-20', score: 3 }]);
+  equal(feelingTrend(entries, '2026-11-18', 29), []);
+  equal(feelingTrend({}, '2026-11-18', 30), []);
+});
+
+test('the trend direction compares the later half with the earlier half and needs four points', () => {
+  const run = (scores) => scores.map((score, index) => ({ date: '2026-11-0' + (index + 1), score }));
+  equal(trendDirection(run([1, 2, 3])), null);
+  equal(trendDirection(run([2, 2, 3, 4])), 'up');
+  equal(trendDirection(run([4, 3, 2, 1])), 'down');
+  equal(trendDirection(run([3, 3, 3, 3])), 'steady');
 });
 
 const failures = results.filter((r) => r.error);

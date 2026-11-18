@@ -1039,3 +1039,12 @@ form h3 { font-size: 17px; }
 .run-nav { display: flex; gap: 12px; }
 .run-nav .btn { flex: 1; min-height: 52px; font-size: 18px; }
 @media (max-width: 480px) { .run-step-name { font-size: 24px; } .run-clock { font-size: 48px; } }
+
+/* ===== Journal trends ===== */
+.trends { margin-top: 8px; }
+.trend-chart { display: block; width: 100%; max-width: 480px; height: auto; margin-top: 8px; }
+.trend-grid { stroke: var(--border); stroke-width: 1; }
+.trend-label { fill: var(--text-dim); font-size: 11px; }
+.trend-line { fill: none; stroke: var(--sage-deep); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.trend-dot { fill: var(--sage-deep); stroke: var(--surface); stroke-width: 2; }
+.trend-summary { margin: 10px 0 0; color: var(--text-dim); }
