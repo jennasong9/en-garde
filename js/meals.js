@@ -140,9 +140,14 @@ export function isNewMealWeek(savedWeek, thisWeek) {
   return typeof savedWeek === 'string' && savedWeek !== '' && savedWeek !== thisWeek;
 }
 
-// The same meals with every Prepped tick cleared, for the start of a new week.
+// The same meals with every Prepped tick and every meal photo cleared, for the start of a new
+// week (a photo shows what that week's meal looked like).
 export function clearPrepped(meals) {
-  return meals.map((meal) => (meal.prepped ? { ...meal, prepped: false } : meal));
+  return meals.map((meal) => {
+    if (!meal.prepped && !meal.photoId) return meal;
+    const { photoId, ...rest } = meal;
+    return { ...rest, prepped: false };
+  });
 }
 
 // A macro counts as hit for a day when the prepped meals come to 90 to 110 percent of its target.
@@ -262,7 +267,7 @@ export function copyDay(meals, fromDay, toDays, makeId) {
   const withGroups = meals.map((meal) => (groupIds.has(meal.id) ? { ...meal, groupId: groupIds.get(meal.id) } : meal));
   const source = mealsOn(withGroups, fromDay);
   const kept = withGroups.filter((meal) => !targets.includes(meal.day));
-  const copies = targets.flatMap((day) => source.map((meal) => ({ ...meal, id: makeId(), day, prepped: false })));
+  const copies = targets.flatMap((day) => source.map((meal) => ({ ...meal, id: makeId(), day, prepped: false, photoId: undefined })));
   return [...kept, ...copies];
 }
 
@@ -285,7 +290,7 @@ export function copyMeal(meals, meal, toDays, makeId) {
     if (meals.some((other) => other.day === day && isCopyOf(meal, other))) skippedDays.push(day);
     else {
       copiedDays.push(day);
-      additions.push({ ...meal, id: makeId(), day, prepped: false, groupId, rank: undefined });
+      additions.push({ ...meal, id: makeId(), day, prepped: false, groupId, rank: undefined, photoId: undefined });
     }
   }
   const updated = meals.map((other) => (other.id === meal.id ? { ...other, groupId } : other));

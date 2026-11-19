@@ -47,6 +47,8 @@ import { showToast } from './toast.js';
 import { buildMenu, setupMenu } from './menu.js';
 import { renderTodayTray } from './today-tray.js';
 import { loadJson, saveJson } from './storage.js';
+import { shrinkPhoto, unusedPhotoIds, validatePhotoFile } from './mealphoto.js';
+import { deletePhoto, listPhotoIds, loadPhoto, savePhoto } from './photostore.js';
 
 const stored = loadJson('meals', []);
 let meals = Array.isArray(stored) ? stored : [];
@@ -80,6 +82,33 @@ let copyFromDay = 0;
 function persist() {
   saveJson('meals', meals);
   saveJson('mealHistory', history);
+  prunePhotos();
+}
+
+// ---------- meal photos ----------
+// A photo is kept in browser storage by id and the meal remembers that id (`photoId`). Pictures are
+// shown through addresses made once per photo.
+const photoUrls = new Map();
+function photoUrl(id) {
+  if (!photoUrls.has(id)) {
+    photoUrls.set(id, loadPhoto(id).then((blob) => (blob ? URL.createObjectURL(blob) : null)).catch(() => null));
+  }
+  return photoUrls.get(id);
+}
+
+// Deletes saved photos that no meal uses any more (after a delete, a new week, a loaded plan, or a
+// change of photo). It waits while the meal form is open, because a photo just added there is not
+// on a meal until the meal is saved.
+async function prunePhotos() {
+  if (mealDialog.open) return;
+  try {
+    for (const id of unusedPhotoIds(await listPhotoIds(), meals)) {
+      await deletePhoto(id);
+      photoUrls.delete(id);
+    }
+  } catch {
+    // Photos that cannot be cleaned up now are tried again the next time meals are saved.
+  }
 }
 
 // Prepped ticks start fresh every Monday. The week the ticks belong to is saved, so opening the
@@ -346,6 +375,15 @@ function mealCard(meal) {
   }, el('b', { text: meal.name }));
   for (const line of detailLines(meal)) main.append(el('span', { class: 'meal-meta', text: line }));
   if (meal.desc) main.append(el('span', { class: 'meal-desc', text: meal.desc }));
+  if (meal.photoId) {
+    const picture = el('img', { class: 'meal-photo', alt: 'Photo of ' + meal.name, hidden: '' });
+    photoUrl(meal.photoId).then((url) => {
+      if (!url) return;
+      picture.src = url;
+      picture.hidden = false;
+    });
+    main.append(picture);
+  }
 
   const card = el('div', { class: 'meal-card' + (meal.prepped ? ' prepped' : ''), 'data-id': meal.id },
     el('label', { class: 'meal-check' }, prepBox), main);
@@ -590,6 +628,7 @@ function openMealForm(meal, day) {
   $('#mFat').value = meal && meal.fat ? meal.fat : '';
   $('#mPrepped').checked = meal ? Boolean(meal.prepped) : false;
   $('#mealError').textContent = '';
+  setFormPhoto(meal?.photoId ?? '');
   const others = meal ? linkedMeals(meals, meal) : [];
   $('#mealLinkedNote').hidden = others.length === 0;
   $('#mealLinkedNote').textContent = 'This meal is also on ' + dayList(others)
@@ -602,6 +641,59 @@ function openMealForm(meal, day) {
   mealGuard.reset();
   $('#mName').focus();
 }
+
+// The photo shown in the meal form: '' for none. It belongs to this one meal, never to its copies
+// on other days.
+let formPhotoId = '';
+
+function setFormPhoto(id) {
+  formPhotoId = id;
+  $('#mPhotoState').value = id;
+  $('#mPhotoError').textContent = '';
+  const preview = $('#mPhotoPreview');
+  preview.hidden = true;
+  if (id !== '') {
+    photoUrl(id).then((url) => {
+      if (!url || formPhotoId !== id) return;
+      preview.src = url;
+      preview.hidden = false;
+    });
+  }
+  $('#mPhotoAdd').textContent = id === '' ? 'Add a photo' : 'Change photo';
+  $('#mPhotoRemove').hidden = id === '';
+}
+
+function applyFormPhoto(meal) {
+  if (formPhotoId === '') delete meal.photoId;
+  else meal.photoId = formPhotoId;
+}
+
+$('#mPhotoAdd').addEventListener('click', () => $('#mPhotoFile').click());
+$('#mPhotoRemove').addEventListener('click', () => setFormPhoto(''));
+$('#mPhotoFile').addEventListener('change', async (event) => {
+  const [file] = event.target.files;
+  event.target.value = '';
+  if (!file) return;
+  const problem = validatePhotoFile(file);
+  if (problem) {
+    $('#mPhotoError').textContent = problem;
+    return;
+  }
+  const addButton = $('#mPhotoAdd');
+  addButton.disabled = true;
+  addButton.textContent = 'Adding photo...';
+  try {
+    setFormPhoto(await savePhoto(await shrinkPhoto(file)));
+  } catch (error) {
+    setFormPhoto(formPhotoId);
+    $('#mPhotoError').textContent = error.message;
+  } finally {
+    addButton.disabled = false;
+  }
+});
+
+// Photos added in the form but not kept (Cancel, or closing it) are cleaned up here.
+mealDialog.addEventListener('close', prunePhotos);
 
 $('#mealForm').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -633,6 +725,7 @@ $('#mealForm').addEventListener('submit', (event) => {
   };
   if (!editingMealId) {
     const added = { id: makeId(), day: formDay, ...fields };
+    applyFormPhoto(added);
     meals.push(added);
     finishMealSave(added);
     return;
@@ -641,6 +734,7 @@ $('#mealForm').addEventListener('submit', (event) => {
   const others = linkedMeals(meals, meal);
   if (others.length === 0 || !changesSharedDetails(meal, fields)) {
     Object.assign(meal, fields);
+    applyFormPhoto(meal);
     finishMealSave(meal);
     return;
   }
@@ -677,6 +771,7 @@ function finishLinkedEdit(applyToAll) {
   if (applyToAll) meals = applyToLinked(meals, meal, fields);
   const saved = meals.find((m) => m.id === meal.id);
   Object.assign(saved, applyToAll ? { prepped: fields.prepped } : fields);
+  applyFormPhoto(saved);
   finishMealSave(saved);
 }
 
@@ -921,3 +1016,5 @@ $('#mealCopy').addEventListener('click', () => {
   mealDialog.close();
   openCopy({ meal });
 });
+
+prunePhotos();

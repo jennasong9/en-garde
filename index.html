@@ -549,6 +549,17 @@
           <input type="number" id="mKcal" min="0" max="5000" step="10" inputmode="numeric">
         </label>
       </div>
+      <div class="field meal-photo-field" id="mealPhotoField">
+        <span class="field-label">Photo (optional)</span>
+        <img class="meal-photo-preview" id="mPhotoPreview" alt="Photo of this meal" hidden>
+        <div class="meal-photo-actions">
+          <button class="btn ghost" id="mPhotoAdd" type="button">Add a photo</button>
+          <button class="btn ghost" id="mPhotoRemove" type="button" hidden>Remove photo</button>
+        </div>
+        <input type="file" id="mPhotoFile" accept="image/*" hidden>
+        <input type="hidden" id="mPhotoState">
+        <p class="form-error" id="mPhotoError" role="alert"></p>
+      </div>
       <fieldset class="field">
         <legend>Macros in this meal (grams, optional)</legend>
         <div class="field-row">

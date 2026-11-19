@@ -8,6 +8,7 @@ import {
   saveProfileList,
   setActiveProfile,
 } from './storage.js';
+import { deleteProfilePhotos } from './photostore.js';
 import { deleteProfileVideos } from './videostore.js';
 
 const CONFIRM_MS = 4000;
@@ -44,7 +45,7 @@ export function initProfileMenu() {
     const id = activeProfileId();
     deleteProfileData(id);
     saveProfileList(loadProfileList().filter((entry) => entry.id !== id));
-    // Wait for the videos to go before the page reloads, or the reload could cut it short.
-    deleteProfileVideos(id).catch(() => {}).then(leaveProfile);
+    // Wait for the videos and photos to go before the page reloads, or the reload could cut it short.
+    Promise.all([deleteProfileVideos(id), deleteProfilePhotos(id)].map((removal) => removal.catch(() => {}))).then(leaveProfile);
   });
 }

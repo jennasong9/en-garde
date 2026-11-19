@@ -54,6 +54,7 @@ import { renderFocusStrip } from './focus-strip.js';
 import { planAsSheet, planAsText, planDays } from './mealexport.js';
 import { DEFAULT_REMINDERS, dueMeals, mealReminderText, normalizeReminders, normalizeSent, waterDue, waterReminderText } from './reminders.js';
 import { crc32, sheetToXlsx, zipStored } from './xlsx.js';
+import { shrunkSize, unusedPhotoIds, validatePhotoFile } from './mealphoto.js';
 import { FEELING_SCORES, feelingTrend, trendDirection, entriesOn, entryForSession, entryParts, feelingOf, freeSlots, latestFocus, matchesFeeling, normalizeEntries, normalizeSort, placeInCustomOrder, sortEntries, validateEntry } from './journal.js';
 import { isStrayClick } from './confirm.js';
 import {
@@ -1921,6 +1922,38 @@ test('the trend direction compares the later half with the earlier half and need
   equal(trendDirection(run([2, 2, 3, 4])), 'up');
   equal(trendDirection(run([4, 3, 2, 1])), 'down');
   equal(trendDirection(run([3, 3, 3, 3])), 'steady');
+});
+
+test('meal photos are shrunk to 800 px on the long side, keeping their shape, and never enlarged', () => {
+  equal(shrunkSize(4000, 3000), { width: 800, height: 600 });
+  equal(shrunkSize(3000, 4000), { width: 600, height: 800 });
+  equal(shrunkSize(500, 400), { width: 500, height: 400 });
+  equal(shrunkSize(10000, 1), { width: 800, height: 1 });
+});
+
+test('only image files up to 25 MB are accepted as meal photos', () => {
+  equal(validatePhotoFile({ type: 'image/jpeg', size: 1000 }), null);
+  equal(typeof validatePhotoFile({ type: 'application/pdf', size: 1000 }), 'string');
+  equal(typeof validatePhotoFile({ type: 'image/png', size: 26 * 1024 * 1024 }), 'string');
+  equal(typeof validatePhotoFile(undefined), 'string');
+});
+
+test('saved photos that no meal uses are found, so they can be deleted', () => {
+  const meals = [{ id: 'a', photoId: 'p1' }, { id: 'b' }, { id: 'c', photoId: '' }];
+  equal(unusedPhotoIds(['p1', 'p2', 'p3'], meals), ['p2', 'p3']);
+  equal(unusedPhotoIds([], meals), []);
+});
+
+test('a new week clears meal photos along with the Prepped ticks, and copies start without a photo', () => {
+  const week = clearPrepped([{ id: 'a', day: 1, prepped: true, photoId: 'p1' }, { id: 'b', day: 1, prepped: false, photoId: 'p2' }, { id: 'c', day: 2 }]);
+  equal(week.map((meal) => meal.photoId), [undefined, undefined, undefined]);
+  equal(week.map((meal) => Boolean(meal.prepped)), [false, false, false]);
+  const original = { id: 'a', day: 1, name: 'Lunch', photoId: 'p1' };
+  const copied = copyMeal([original], original, [3], () => 'new').meals.find((meal) => meal.day === 3);
+  equal(copied.photoId, undefined);
+  const dayCopy = copyDay([original], 1, [4], () => 'n2').find((meal) => meal.day === 4);
+  equal(dayCopy.photoId, undefined);
+  equal(original.photoId, 'p1');
 });
 
 const failures = results.filter((r) => r.error);
