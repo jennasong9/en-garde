@@ -1073,3 +1073,13 @@ form h3 { font-size: 17px; }
 .search-hit span { font-size: 13px; color: var(--text-dim); overflow-wrap: anywhere; }
 .search-row .btn { flex: none; align-self: center; }
 .search-more { margin: 4px 2px 0; font-size: 13px; color: var(--text-dim); }
+
+/* Quick-add templates: a row of buttons under the day's sessions */
+.quick-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.quick-add[hidden] { display: none; }
+.quick-add-label { font-size: 13px; color: var(--text-dim); letter-spacing: .04em; text-transform: uppercase; }
+.quick-add-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--sage); border-radius: 999px; background: var(--surface); color: var(--sage-deep); font: inherit; cursor: pointer; }
+.quick-chip:hover { background: var(--sage-soft); }
+#templateForm { margin-top: 16px; }
+#templatesDialog .btn#templateNew { margin-top: 12px; }

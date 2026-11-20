@@ -17,6 +17,7 @@ import {
   renameRoutine,
   upcomingSessionsOfType,
 } from './routinelibrary.js';
+import { MAX_TEMPLATES, cleanTemplates, defaultTemplateName, fieldsFromTemplate, validateTemplate } from './templates.js';
 import { MAX_PER_GROUP, searchAll } from './search.js';
 import { firstUnfinishedIndex, formatClock, moveStep, stepCounter } from './runmode.js';
 import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
@@ -2013,6 +2014,33 @@ test('search shows at most a few results per group but counts them all, and show
   equal(group.total, 9);
   const goal = searchAll('faster', searchData(), '2026-11-17')[0].results[0];
   equal(goal.detail, 'Technique \u00b7 Archived');
+});
+
+const templateFixture = (overrides = {}) => ({ id: 't1', name: 'Footwork 5:00 PM', type: 'footwork', time: '17:00', mins: 45, location: 'Club', notes: '', ...overrides });
+
+test('a template is named from its type and time, and cleaning drops damaged or extra templates', () => {
+  equal(defaultTemplateName({ type: 'footwork', time: '17:00' }), 'Footwork 5:00 PM');
+  equal(defaultTemplateName({ type: 'tournament', time: '' }), 'Tournament all day');
+  const tooMany = Array.from({ length: MAX_TEMPLATES + 2 }, (_, index) => templateFixture({ id: 'x' + index, name: 'T' + index }));
+  const cleaned = cleanTemplates([templateFixture(), { id: 'bad', name: '', type: 'footwork', time: '', mins: 5 }, { id: 'b2', name: 'A', type: 'laser', time: '', mins: 5 },
+    { id: 'b3', name: 'A', type: 'bout', time: '25 pm', mins: 5 }, { id: 'b4', name: 'A', type: 'bout', time: '', mins: 9999 }, null, 'x']);
+  equal(cleaned.map((template) => template.id), ['t1']);
+  equal(cleanTemplates(tooMany).length, MAX_TEMPLATES);
+  equal(cleanTemplates(null), []);
+});
+
+test('a template needs a new name and new details, a sensible length and room in the list', () => {
+  const fields = fieldsFromTemplate(templateFixture());
+  const list = [templateFixture()];
+  equal(validateTemplate('Bouting 6 pm', { ...fields, type: 'bout' }, list), null);
+  equal(validateTemplate('  ', fields, []), 'Give the template a name.');
+  equal(validateTemplate('footwork 5:00 pm', { ...fields, mins: 50 }, list), 'You already have a template with that name. Choose a different name.');
+  equal(validateTemplate('Other', fields, list), 'You already have a template with exactly these details.');
+  equal(validateTemplate('Footwork 5:00 PM', fields, list, 't1'), null);
+  equal(validateTemplate('X', { ...fields, mins: 700 }, []), 'Duration must be a whole number of minutes between 0 and 600.');
+  const full = Array.from({ length: MAX_TEMPLATES }, (_, index) => templateFixture({ id: 'x' + index, name: 'T' + index, mins: index }));
+  equal(validateTemplate('New', { ...fields, mins: 99 }, full), 'You have ' + MAX_TEMPLATES + ' templates. Delete one to add another.');
+  equal(validateTemplate('T0', { ...fields, mins: 0, location: 'Elsewhere' }, full, 'x0'), null);
 });
 
 const failures = results.filter((r) => r.error);

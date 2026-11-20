@@ -15,6 +15,7 @@ import { renderHydration } from './hydration.js';
 import { renderTodayTray } from './today-tray.js';
 import { renderRoutines, setSessionStepsDone, showRoutinesDay, showSavedRoutine } from './routines-page.js';
 import { initSearch } from './search-ui.js';
+import { getTemplates, initTemplates, saveTemplateFrom } from './templates-ui.js';
 import { SECTION_TYPES } from './sessionsteps.js';
 import { hasReflection, offerReflection, renderJournal, viewEntry, writeReflection } from './journal-page.js';
 import { renderNutrition } from './nutrition.js';
@@ -722,6 +723,7 @@ function renderDay() {
   $('#conflictPanel').hidden = !conflict;
   list.hidden = formOpen;
   $('#addSessionBtn').hidden = formOpen;
+  renderQuickAdd();
   dayGuard.reset();
   if (formOpen) return;
 
@@ -732,6 +734,22 @@ function renderDay() {
   }
   for (const session of daySessions) list.append(sessionCard(session));
 }
+
+// The row of quick-add templates under the day's sessions. Tapping one opens the session form already
+// filled in with that template's details.
+function renderQuickAdd() {
+  const templates = getTemplates();
+  $('#quickAdd').hidden = formOpen || Boolean(conflict);
+  $('#manageTemplates').textContent = templates.length === 0 ? 'Set up quick-add' : 'Manage';
+  $('#quickAddChips').replaceChildren(...templates.map((template) => el('button', {
+    class: 'quick-chip',
+    type: 'button',
+    text: template.name,
+    'aria-label': 'Add a session from the template ' + template.name,
+    onclick: () => openForm(null, '', template),
+  })));
+}
+initTemplates(() => renderDay());
 
 function sessionCard(session) {
   const detail = [formatTime(session.time), session.mins ? session.mins + ' min' : '', session.location]
@@ -915,22 +933,25 @@ function updateRepeatSummary() {
   summary.textContent = text;
 }
 
-function openForm(session, presetTime = '') {
+// `template` (a quick-add template) fills in a new session's details instead of the usual ones.
+function openForm(session, presetTime = '', template = null) {
   formOpen = true;
   conflict = null;
   editingId = session ? session.id : null;
   confirmingDeleteId = null;
   setStatus('');
   $('#formError').textContent = '';
-  $('#formTitle').textContent = session ? 'Edit session' : 'Add a session';
+  $('#formTitle').textContent = session ? 'Edit session' : template ? 'Add ' + template.name : 'Add a session';
   $('#saveSession').textContent = session ? 'Save changes' : 'Save session';
-  typeSelect.value = session ? session.type : 'footwork';
-  $('#fTime').value = session ? session.time : presetTime;
-  $('#fAllDay').checked = session ? session.time === '' : false;
+  const source = session || template;
+  typeSelect.value = source ? source.type : 'footwork';
+  $('#fTime').value = source ? source.time : presetTime;
+  $('#fAllDay').checked = source ? source.time === '' : false;
   showTimeFields();
-  $('#fMins').value = session ? session.mins : 60;
-  $('#fLocation').value = session ? session.location : '';
-  $('#fNotes').value = session ? session.notes : '';
+  $('#fMins').value = source ? source.mins : 60;
+  $('#fLocation').value = source ? source.location : '';
+  $('#fNotes').value = source ? source.notes : '';
+  $('#fSaveTemplate').checked = false;
   $('#fRepeat').checked = false;
   $('#fUntil').value = '';
   setSelectedWeekdays([parseIso(dialogDate).getDay()]);
@@ -1020,6 +1041,7 @@ function applySave(fields, plan, replaceIds) {
     parts.push(plan.addDates.length === 1 ? 'Session added.' : 'Added ' + plural(plan.addDates.length, 'session') + '.');
   }
   if (replaceIds.length > 0) parts.push('Replaced ' + plural(replaceIds.length, 'identical session') + '.');
+  if ($('#fSaveTemplate').checked) parts.push(saveTemplateFrom(fields));
   finishSave(parts.join(' '));
 }
 

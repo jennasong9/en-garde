@@ -356,6 +356,11 @@
 
     <div id="dayList"></div>
     <button class="btn" id="addSessionBtn" type="button">+ Add a session</button>
+    <div class="quick-add" id="quickAdd">
+      <span class="quick-add-label">Quick add</span>
+      <div class="quick-add-chips" id="quickAddChips"></div>
+      <button class="link-btn small" id="manageTemplates" type="button">Manage</button>
+    </div>
 
     <form id="sessionForm" hidden novalidate>
       <h3 id="formTitle">Add a session</h3>
@@ -379,6 +384,11 @@
       </label>
       <label class="field">Notes
         <textarea id="fNotes" maxlength="500" placeholder="What is the focus of this session?"></textarea>
+      </label>
+
+      <label class="switch" id="saveTemplateRow">
+        <input type="checkbox" id="fSaveTemplate">
+        <span>Save as a quick-add template</span>
       </label>
 
       <div id="repeatBlock">
@@ -799,6 +809,48 @@
       <button class="icon-btn" id="searchClose" type="button" aria-label="Close search">&#10005;</button>
     </div>
     <div class="search-results" id="searchResults" aria-live="polite"></div>
+  </dialog>
+
+  <dialog id="templatesDialog" aria-labelledby="templatesTitle">
+    <div class="dialog-head">
+      <h2 id="templatesTitle">Quick-add templates</h2>
+      <button class="icon-btn" id="templatesClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p class="tracker-help" id="templatesHelp">Tap a template on any day to start a session already filled in.</p>
+    <ul class="plan-list" id="templateList"></ul>
+    <button class="btn" id="templateNew" type="button">+ New template</button>
+    <form id="templateForm" hidden novalidate>
+      <h3 id="templateFormTitle">New template</h3>
+      <label class="field">Name
+        <input type="text" id="tName" maxlength="40">
+      </label>
+      <label class="field">Session type
+        <select id="tType"></select>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="tAllDay">
+        <span>All day</span>
+      </label>
+      <div class="field-row">
+        <label class="field" id="tTimeField">Time
+          <input type="time" id="tTime">
+        </label>
+        <label class="field" id="tDurationField">Duration (minutes)
+          <input type="number" id="tMins" min="0" max="600" step="5" inputmode="numeric">
+        </label>
+      </div>
+      <label class="field">Location
+        <input type="text" id="tLocation" maxlength="100" placeholder="e.g. Club name">
+      </label>
+      <label class="field">Notes
+        <textarea id="tNotes" maxlength="500" placeholder="What is the focus of this session?"></textarea>
+      </label>
+      <p class="form-error" id="tError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn ghost" id="templateCancel" type="button">Cancel</button>
+        <button class="btn" type="submit">Save template</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="videoDialog" class="video-dialog" aria-labelledby="videoTitle">
