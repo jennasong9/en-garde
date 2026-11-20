@@ -9,6 +9,7 @@ import {
   routineWithoutStep,
   starterRoutines,
   routineSummary,
+  copyOfSteps,
   snapshotRoutine,
   validateRoutineName,
   routineGroups,
@@ -1954,6 +1955,18 @@ test('a new week clears meal photos along with the Prepped ticks, and copies sta
   const dayCopy = copyDay([original], 1, [4], () => 'n2').find((meal) => meal.day === 4);
   equal(dayCopy.photoId, undefined);
   equal(original.photoId, 'p1');
+});
+
+test('copying steps to other sessions keeps YouTube links, drops uploaded videos and says how many', () => {
+  const youtube = { kind: 'youtube', id: 'abc12345678' };
+  const upload = { kind: 'file', id: 'file1', name: 'clip.mp4' };
+  const source = [{ name: 'A', desc: 'one', video: youtube }, { name: 'B', desc: '', video: upload }, { name: 'C', desc: 'three' }];
+  const copy = copyOfSteps(source);
+  equal(copy.steps, [{ name: 'A', desc: 'one', video: youtube }, { name: 'B', desc: '' }, { name: 'C', desc: 'three' }]);
+  equal(copy.droppedVideos, 1);
+  copy.steps[0].video.id = 'changed';
+  equal(source[0].video.id, 'abc12345678');
+  equal(copyOfSteps([]), { steps: [], droppedVideos: 0 });
 });
 
 const failures = results.filter((r) => r.error);

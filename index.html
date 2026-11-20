@@ -773,6 +773,23 @@
     </div>
   </dialog>
 
+  <dialog id="copyStepsDialog" aria-labelledby="copyStepsTitle">
+    <div class="dialog-head">
+      <h2 id="copyStepsTitle">Copy steps to</h2>
+      <button class="icon-btn" id="copyStepsClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <form id="copyStepsForm" novalidate>
+      <p class="tracker-help" id="copyStepsHelp">Choose the sessions that should get these steps. A session that already has steps is replaced.</p>
+      <ul class="plan-list" id="copyStepsList"></ul>
+      <p class="series-note" id="copyStepsNote"></p>
+      <p class="form-error" id="copyStepsError" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn ghost" id="copyStepsCancel" type="button">Cancel</button>
+        <button class="btn" id="copyStepsGo" type="submit">Copy steps</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="videoDialog" class="video-dialog" aria-labelledby="videoTitle">
     <div class="dialog-head">
       <h2 id="videoTitle"></h2>

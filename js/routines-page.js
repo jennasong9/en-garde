@@ -29,6 +29,7 @@ import { hasReflection, writeReflection } from './journal-page.js';
 import { showToast } from './toast.js';
 import {
   cleanSavedRoutines,
+  copyOfSteps,
   defaultRoutineName,
   routineHasStep,
   renameRoutine,
@@ -208,10 +209,18 @@ function sessionSection(session) {
         'aria-label': 'Add a step to this ' + info.short + ' session',
         onclick: () => openForm(session.id, null),
       }),
+      ...(steps.length > 0 ? [el('button', {
+        class: 'btn ghost small',
+        type: 'button',
+        text: progress.done === progress.total ? 'Clear ticks' : 'Mark all done',
+        'aria-label': (progress.done === progress.total ? 'Clear every tick in' : 'Tick every step of') + ' this ' + info.short + ' session',
+        onclick: (event) => setAllTicks(session, progress.done !== progress.total, event.currentTarget),
+      })] : []),
       reflectionButton(session),
       buildMenu('btn ghost small', 'Saved ' + info.short + ' routines', ['Saved routines ', el('span', { class: 'chevron', 'aria-hidden': 'true' })], [
         { text: 'Save these steps as a routine', onclick: () => openSaveRoutine(session) },
         { text: 'Load a saved routine', onclick: () => openLoadRoutine(session) },
+        ...(steps.length > 0 ? [{ text: 'Copy steps to other sessions\u2026', onclick: () => openCopySteps(session) }] : []),
       ])));
   }
   return section;
@@ -252,6 +261,21 @@ function toggleTick(session, step) {
   // The Schedule owns the Done box, so ask it to change (it saves before this screen redraws).
   if (done !== null) document.dispatchEvent(new CustomEvent('session-done-change', { detail: { id: session.id, done } }));
   return { before, after };
+}
+
+// "Mark all done" / "Clear ticks": ticks every step of a session, or clears them all. The Schedule's
+// Done box follows, as it does when the last step is ticked by hand.
+function setAllTicks(session, done, button) {
+  const steps = stepsOf(session.id);
+  const spot = button.getBoundingClientRect();
+  const before = sessionProgress(steps, ticks[session.id] || []);
+  ticks = { ...ticks, [session.id]: ticksForDone(steps, done) };
+  persistTicks();
+  const after = sessionProgress(steps, ticks[session.id]);
+  const doneChange = doneAfterTick(before, after);
+  if (doneChange !== null) document.dispatchEvent(new CustomEvent('session-done-change', { detail: { id: session.id, done: doneChange } }));
+  renderRoutines();
+  if (finishedSession(before, after)) burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
 }
 
 function stepRow(session, step, index, isDone) {
@@ -914,3 +938,62 @@ runDialog.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowRight') moveRun(1);
   if (event.key === 'ArrowLeft' && run.index > 0) moveRun(-1);
 });
+
+// ---------- copy a session's steps to other sessions of the same type ----------
+const copyStepsDialog = $('#copyStepsDialog');
+let copySource = null;
+
+function openCopySteps(session) {
+  copySource = session;
+  const targets = upcomingSessionsOfType(allSessions().filter((other) => other.id !== session.id), session.type, toIso(new Date()), 14);
+  $('#copyStepsTitle').textContent = 'Copy ' + SESSION_TYPES[session.type].short + ' steps to';
+  $('#copyStepsError').textContent = '';
+  const uploads = stepsOf(session.id).filter((step) => step.video?.kind === 'file').length;
+  $('#copyStepsNote').textContent = uploads === 0 ? '' : 'Uploaded video files are not copied (' + uploads + (uploads === 1 ? ' step has one' : ' steps have them') + '), but YouTube links are.';
+  $('#copyStepsHelp').hidden = targets.length === 0;
+  $('#copyStepsGo').disabled = targets.length === 0;
+  $('#copyStepsList').replaceChildren(...(targets.length === 0
+    ? [el('li', { class: 'empty', text: 'No other upcoming ' + SESSION_TYPES[session.type].short + ' sessions. Add some on the Schedule first, then come back.' })]
+    : targets.map((target) => {
+      const day = parseIso(target.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      const when = [day, target.time ? formatTime(target.time) : 'All day', target.location].filter(Boolean).join(' \u00b7 ');
+      const existing = stepsOf(target.id).length;
+      return el('li', { class: 'plan-item' }, el('label', { class: 'copy-target' },
+        el('input', { type: 'checkbox', value: target.id }),
+        el('span', { class: 'plan-info' },
+          el('b', { text: when }),
+          el('span', { text: existing === 0 ? 'No steps yet' : 'Has ' + routineSummary({ steps: stepsOf(target.id) }) + ', will be replaced' }))));
+    })));
+  showDialog(copyStepsDialog);
+}
+
+$('#copyStepsForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const chosen = [...$('#copyStepsList').querySelectorAll('input:checked')].map((box) => box.value);
+  if (chosen.length === 0) {
+    $('#copyStepsError').textContent = 'Tick at least one session to copy to.';
+    return;
+  }
+  const { steps } = copyOfSteps(stepsOf(copySource.id));
+  for (const id of chosen) {
+    const before = sessionProgress(stepsOf(id), ticks[id] || []);
+    for (const step of stepsOf(id)) {
+      if (step.video?.kind === 'file') deleteVideo(step.video.id).catch(() => {});
+    }
+    setSteps(id, steps.map((step) => ({ ...step })), '');
+    // A target already marked Done on the Schedule gets the new steps ticked, so the two agree.
+    const markedDone = allSessions().some((session) => session.id === id && session.done);
+    ticks = { ...ticks, [id]: ticksForDone(steps, markedDone) };
+    persistTicks();
+    syncDone(id, before);
+  }
+  adding = null;
+  editing = null;
+  confirmingRemove = null;
+  copyStepsDialog.close();
+  renderRoutines();
+  showToast('Copied ' + routineSummary({ steps }) + ' to ' + chosen.length + (chosen.length === 1 ? ' session.' : ' sessions.'));
+});
+closeOnBackdropClick(copyStepsDialog);
+$('#copyStepsClose').addEventListener('click', () => copyStepsDialog.close());
+$('#copyStepsCancel').addEventListener('click', () => copyStepsDialog.close());

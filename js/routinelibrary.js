@@ -30,15 +30,22 @@ export function validateRoutineName(name, routines) {
   return null;
 }
 
-// A saved copy of the steps. A YouTube link is kept; an uploaded video file is not (the file could
-// be removed from the step later), and `droppedVideos` says how many were left out.
-export function snapshotRoutine(steps, name, savedAt, makeId) {
+// A copy of steps to give another session or a saved routine. A YouTube link is kept; an uploaded
+// video file is not (the file belongs to one step, and removing it there would break the copy), and
+// `droppedVideos` says how many were left out.
+export function copyOfSteps(steps) {
   const copies = steps.map((step) => {
     const copy = { name: step.name, desc: step.desc || '' };
     if (step.video?.kind === 'youtube') copy.video = { ...step.video };
     return copy;
   });
   const droppedVideos = steps.filter((step) => step.video?.kind === 'file').length;
+  return { steps: copies, droppedVideos };
+}
+
+// A saved copy of the steps.
+export function snapshotRoutine(steps, name, savedAt, makeId) {
+  const { steps: copies, droppedVideos } = copyOfSteps(steps);
   return { id: makeId(), name: name.trim(), savedAt, steps: copies, droppedVideos };
 }
 
