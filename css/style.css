@@ -1057,3 +1057,19 @@ form h3 { font-size: 17px; }
 
 .copy-target { display: flex; align-items: center; gap: 12px; width: 100%; cursor: pointer; }
 .copy-target input { width: 22px; height: 22px; flex: none; }
+
+/* Search: an icon beside the settings gear opens a pop-up with the box and the results */
+.search-dialog { width: min(600px, calc(100% - 24px)); align-self: start; margin-top: 8vh; }
+.search-dialog .dialog-head { gap: 10px; }
+.search-input { flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 16px; }
+.search-results { margin-top: 12px; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.search-hint { margin: 4px 2px; color: var(--text-dim); font-size: 14px; }
+.search-group h3 { margin: 0 0 6px; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); }
+.search-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.search-row { display: flex; align-items: stretch; gap: 6px; }
+.search-hit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); color: var(--text); font: inherit; cursor: pointer; }
+.search-hit:hover, .search-hit:focus-visible { border-color: var(--sage-deep); }
+.search-hit b { overflow-wrap: anywhere; }
+.search-hit span { font-size: 13px; color: var(--text-dim); overflow-wrap: anywhere; }
+.search-row .btn { flex: none; align-self: center; }
+.search-more { margin: 4px 2px 0; font-size: 13px; color: var(--text-dim); }

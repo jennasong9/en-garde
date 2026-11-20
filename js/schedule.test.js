@@ -17,6 +17,7 @@ import {
   renameRoutine,
   upcomingSessionsOfType,
 } from './routinelibrary.js';
+import { MAX_PER_GROUP, searchAll } from './search.js';
 import { firstUnfinishedIndex, formatClock, moveStep, stepCounter } from './runmode.js';
 import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
@@ -1967,6 +1968,51 @@ test('copying steps to other sessions keeps YouTube links, drops uploaded videos
   copy.steps[0].video.id = 'changed';
   equal(source[0].video.id, 'abc12345678');
   equal(copyOfSteps([]), { steps: [], droppedVideos: 0 });
+});
+
+const searchData = () => ({
+  sessions: [
+    { id: 's1', type: 'footwork', date: '2026-11-20', time: '17:00', location: 'Point Fencing Club', notes: '', done: false },
+    { id: 's2', type: 'bout', date: '2026-11-24', time: '18:00', location: 'Gym', notes: 'bring lame', done: false },
+    { id: 's3', type: 'footwork', date: '2026-11-10', time: '17:00', location: 'Gym', notes: '', done: true },
+  ],
+  savedRoutines: { ...cleanSavedRoutines(null), footwork: [{ id: 'r1', name: 'Quick feet', savedAt: '', steps: [{ name: 'Lunge chain', desc: 'six reps' }] }] },
+  goals: [{ id: 'g1', name: 'Win a medal', tag: 'competition', due: '2026-12-01' }, { id: 'g2', name: 'Faster lunge', tag: 'technique', archived: true }],
+  journal: { j1: { id: 'j1', date: '2026-11-20', feeling: 'sharp', text: 'Lunge felt great today', sessionLabel: 'Footwork & agility, 5:00 PM', sessionId: 's1' } },
+});
+
+test('search finds sessions, saved routines, goals and journal entries by any word in them', () => {
+  const kinds = (query) => searchAll(query, searchData(), '2026-11-17').map((group) => group.kind);
+  equal(kinds('lunge'), ['routine', 'goal', 'journal']);
+  equal(kinds('gym'), ['session']);
+  equal(kinds('competition'), ['goal']);
+  equal(kinds('friday'), ['session', 'journal']);
+  equal(kinds('bring lame'), ['session']);
+  equal(kinds('zzzz'), []);
+});
+
+test('search needs every typed word, ignores capitals, and waits for two letters', () => {
+  equal(searchAll('lunge', searchData(), '2026-11-17').length, 3);
+  equal(searchAll('LUNGE great', searchData(), '2026-11-17').map((group) => group.kind), ['journal']);
+  equal(searchAll('l', searchData(), '2026-11-17'), []);
+  equal(searchAll('   ', searchData(), '2026-11-17'), []);
+});
+
+test('search lists upcoming sessions first (nearest first), then past ones, and says why a routine matched', () => {
+  const sessions = searchAll('footwork', searchData(), '2026-11-17')[0].results.map((result) => result.id);
+  equal(sessions, ['s1', 's3']);
+  const routine = searchAll('lunge', searchData(), '2026-11-17')[0].results[0];
+  equal(routine.detail, 'Footwork \u00b7 1 step \u00b7 has "Lunge chain"');
+  equal(searchAll('gym', searchData(), '2026-11-17')[0].results.map((result) => result.id), ['s2', 's3']);
+});
+
+test('search shows at most a few results per group but counts them all, and shows archived goals as such', () => {
+  const sessions = Array.from({ length: 9 }, (_, index) => ({ id: 'x' + index, type: 'blade', date: '2026-12-0' + (index + 1), time: '09:00', location: 'Club' }));
+  const [group] = searchAll('club', { sessions }, '2026-11-17');
+  equal(group.results.length, MAX_PER_GROUP);
+  equal(group.total, 9);
+  const goal = searchAll('faster', searchData(), '2026-11-17')[0].results[0];
+  equal(goal.detail, 'Technique \u00b7 Archived');
 });
 
 const failures = results.filter((r) => r.error);

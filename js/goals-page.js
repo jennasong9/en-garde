@@ -530,6 +530,12 @@ function openGoalForm(goal) {
   $('#gName').focus();
 }
 
+// Opens a goal's edit pop-up (used by search), or does nothing if the goal is gone.
+export function openGoal(id) {
+  const goal = goals.find((candidate) => candidate.id === id);
+  if (goal) openGoalForm(goal);
+}
+
 $('#addGoalBtn').addEventListener('click', () => openGoalForm(null));
 
 $('#goalArchiveToggle').addEventListener('click', () => {

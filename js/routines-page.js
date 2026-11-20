@@ -467,7 +467,10 @@ function goToDay(iso) {
 }
 
 // Shows the Routines page on a given day (used by the Schedule's "Open routine" button).
-export const showRoutinesDay = goToDay;
+export function showRoutinesDay(iso) {
+  view = 'day';
+  goToDay(iso);
+}
 
 $('#routineToday').addEventListener('click', () => goToDay(toIso(new Date())));
 $('#routinePrev').addEventListener('click', () => goToDay(shiftAnchor('day', currentDay(), -1)));
@@ -679,6 +682,14 @@ let deletingRoutineId = null;
 let usingRoutine = null;
 let replacingSessionId = null;
 
+// Shows the Saved routines half with one routine's steps open and in view (used by search).
+export function showSavedRoutine(id) {
+  view = 'saved';
+  openRoutineIds.add(id);
+  renderRoutines();
+  setTimeout(() => document.querySelector('[data-routine="' + id + '"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 200);
+}
+
 function renderViewSwitch() {
   const names = { day: 'By day', saved: 'Saved routines (' + savedRoutineCount(savedRoutines) + ')' };
   setSwitchButtons($('#routineViewSwitch'), Object.entries(names).map(([name, label]) => el('button', {
@@ -724,7 +735,7 @@ function savedRoutineRow(type, routine) {
   const head = el('div', { class: 'plan-info' },
     el('b', { text: routine.name }),
     el('span', { text: (saved ? 'Saved ' + saved + ' \u00b7 ' : '') + routineSummary(routine) }));
-  const row = el('li', { class: 'plan-item saved-routine' }, head);
+  const row = el('li', { class: 'plan-item saved-routine', 'data-routine': routine.id }, head);
 
   if (renamingRoutine && renamingRoutine.id === routine.id) {
     const input = el('input', { type: 'text', maxlength: String(60), value: renamingRoutine.name, 'aria-label': 'New name for ' + routine.name });

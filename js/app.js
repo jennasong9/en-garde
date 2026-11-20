@@ -10,10 +10,11 @@ import { setSwitchButtons, updateSwitch } from './pill.js';
 import { enableSwitchDrag } from './switch-drag.js';
 import { pingToday } from './today-ping.js';
 import { currentFencerLink, disconnectFencerLink, initFencerLinks, saveFencerLink } from './fencer-links.js';
-import { renderGoals } from './goals-page.js';
+import { openGoal, renderGoals } from './goals-page.js';
 import { renderHydration } from './hydration.js';
 import { renderTodayTray } from './today-tray.js';
-import { renderRoutines, setSessionStepsDone, showRoutinesDay } from './routines-page.js';
+import { renderRoutines, setSessionStepsDone, showRoutinesDay, showSavedRoutine } from './routines-page.js';
+import { initSearch } from './search-ui.js';
 import { SECTION_TYPES } from './sessionsteps.js';
 import { hasReflection, offerReflection, renderJournal, viewEntry, writeReflection } from './journal-page.js';
 import { renderNutrition } from './nutrition.js';
@@ -1207,12 +1208,38 @@ document.addEventListener('open-journal-entry', (event) => {
 
 // The "Open routine" button on a session: shows that session's day on the Routines page, with a way
 // back, since the page changes under the user. (Rest and Tournament have no routine.)
-function openRoutine(session) {
+function openRoutine(session, back = '#schedule') {
   dayDialog.close();
   showRoutinesDay(session.date);
   location.hash = '#routines';
-  showToast('Opened Routines.', { actionLabel: 'Go back', onAction: () => { location.hash = '#schedule'; } });
+  showToast('Opened Routines.', { actionLabel: 'Go back', onAction: () => { location.hash = back; } });
 }
+
+// ---------- search ----------
+// The page the person was on when they searched, to offer a way back after jumping elsewhere.
+const pageBeforeSearch = () => location.hash || '#schedule';
+
+// Goes to `hash`, runs `open` (which may open a pop-up) and, when that is a different page, says so
+// with a way back. The message is shown last so it sits inside any pop-up and stays clickable.
+function jumpFromSearch(hash, message, open) {
+  const back = pageBeforeSearch();
+  if (back !== hash) location.hash = hash;
+  open();
+  if (back !== hash) showToast(message, { actionLabel: 'Go back', onAction: () => { document.querySelector('dialog[open]')?.close(); location.hash = back; } });
+}
+
+initSearch({
+  session: ({ session }) => {
+    const back = pageBeforeSearch();
+    location.hash = '#schedule';
+    openDay(session.date);
+    if (back !== '#schedule') showToast('Opened the Schedule.', { actionLabel: 'Go back', onAction: () => { dayDialog.close(); location.hash = back; } });
+  },
+  sessionRoutine: ({ session }) => openRoutine(session, pageBeforeSearch()),
+  routine: ({ id }) => jumpFromSearch('#routines', 'Opened your saved routines.', () => showSavedRoutine(id)),
+  goal: ({ id }) => jumpFromSearch('#goals', 'Opened Goals.', () => openGoal(id)),
+  journal: ({ id }) => openJournal(id, pageBeforeSearch()),
+});
 
 function showPage() {
   const requested = location.hash.slice(1);
