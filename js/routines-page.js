@@ -25,7 +25,7 @@ import { deleteVideo, loadVideo, saveVideo } from './videostore.js';
 import { buildMenu } from './menu.js';
 import { setSwitchButtons } from './pill.js';
 import { firstUnfinishedIndex, formatClock, moveStep, stepCounter } from './runmode.js';
-import { hasReflection, writeReflection } from './journal-page.js';
+import { hasReflection, offerReflection, writeReflection } from './journal-page.js';
 import { showToast } from './toast.js';
 import {
   cleanSavedRoutines,
@@ -900,7 +900,8 @@ function moveRun(direction) {
     closeRun();
     renderRoutines();
     if (finishedNow && spot) burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
-    showToast('Finished the ' + SESSION_TYPES[run.session.type].short + ' session in ' + total + '.');
+    const finishedText = 'Finished the ' + SESSION_TYPES[run.session.type].short + ' session in ' + total + '.';
+    if (!offerReflection(run.session, finishedText + ' How did it feel?')) showToast(finishedText);
     return;
   }
   run.index = move.index;

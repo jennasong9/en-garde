@@ -22,6 +22,7 @@ import {
 import { isStrayClick } from './confirm.js';
 import { SESSION_TYPES, cleanSessions, formatTime, makeId, parseIso, sessionsOn, shiftAnchor, toIso } from './schedule.js';
 import { loadJson, saveJson } from './storage.js';
+import { showToast } from './toast.js';
 import { createVideoReview } from './video-review-ui.js';
 import { deleteVideo } from './videostore.js';
 
@@ -413,6 +414,26 @@ export function viewEntry(id) {
 // A session's reflection: the button on a session reads "View reflection" when one exists.
 export const hasReflection = (session) => entryForSession(entries, session.date, session.id) !== null;
 
+// The session whose entry was started from a "How did it feel?" prompt, so saving it can offer a
+// way to the Journal.
+let promptedSessionId = null;
+
+// After a session is marked Done: a small message with a "Write entry" button that opens the entry
+// form already set to that day and session. Does nothing (and returns false) when the session
+// already has an entry. `message` replaces the usual wording.
+export function offerReflection(session, message = '') {
+  if (hasReflection(session)) return false;
+  showToast(message || 'Marked ' + SESSION_TYPES[session.type].short + ' Done. How did it feel?', {
+    actionLabel: 'Write entry',
+    ms: 12000,
+    onAction: () => {
+      promptedSessionId = session.id;
+      writeReflection(session);
+    },
+  });
+  return true;
+}
+
 // The "Write reflection" button on a session: opens that session's entry for reading, or a new
 // entry about that session.
 export function writeReflection(session) {
@@ -557,6 +578,7 @@ $('#journalForm').addEventListener('submit', async (event) => {
   }
   const before = dialogId ? entries[dialogId] : null;
   const chosen = $('#jSession').value;
+  const fromPrompt = chosen !== '' && chosen === promptedSessionId;
   const taken = entryForSession(entries, dialogDate, chosen);
   if (taken && taken.id !== dialogId) {
     $('#journalError').textContent = 'That session already has an entry. Open it from the day, or choose another session.';
@@ -587,6 +609,13 @@ $('#journalForm').addEventListener('submit', async (event) => {
   if (!before) {
     const id = makeId();
     persist(id, { ...entry, id, date: dialogDate, createdAt: now, editedAt: now });
+    if (fromPrompt) {
+      showToast('Saved your entry.', {
+        actionLabel: 'Open in Journal',
+        ms: 10000,
+        onAction: () => document.dispatchEvent(new CustomEvent('open-journal-entry', { detail: { id, back: location.hash } })),
+      });
+    }
   } else if (videoChanged || keys.some((key) => (before[key] || '') !== entry[key])) {
     persist(dialogId, { ...before, ...entry, editedAt: now });
   }
@@ -609,7 +638,10 @@ $('#journalDelete').addEventListener('click', () => {
   renderJournal();
 });
 
-journalDialog.addEventListener('close', () => videoReview.stop());
+journalDialog.addEventListener('close', () => {
+  videoReview.stop();
+  promptedSessionId = null;
+});
 const journalGuard = protectUnsavedChanges(journalDialog, () => formState($('#journalForm')));
 $('#journalClose').addEventListener('click', () => journalDialog.close());
 $('#journalCancel').addEventListener('click', () => journalDialog.close());

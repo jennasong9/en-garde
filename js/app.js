@@ -15,7 +15,7 @@ import { renderHydration } from './hydration.js';
 import { renderTodayTray } from './today-tray.js';
 import { renderRoutines, setSessionStepsDone, showRoutinesDay } from './routines-page.js';
 import { SECTION_TYPES } from './sessionsteps.js';
-import { hasReflection, renderJournal, viewEntry, writeReflection } from './journal-page.js';
+import { hasReflection, offerReflection, renderJournal, viewEntry, writeReflection } from './journal-page.js';
 import { renderNutrition } from './nutrition.js';
 import { loadJson, saveJson } from './storage.js';
 import { initProfileMenu, rememberProfile } from './profile-menu.js';
@@ -744,7 +744,10 @@ function sessionCard(session) {
     persist();
     renderAll();
     renderDay();
-    if (session.done) burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
+    if (session.done) {
+      burstConfetti(spot.left + spot.width / 2, spot.top + spot.height / 2);
+      offerReflection(session);
+    }
   });
 
   const card = el('div', { class: 'session-card type-' + session.type + (session.done ? ' done' : '') },
@@ -1185,17 +1188,22 @@ const PAGES = ['schedule', 'routines', 'nutrition', 'journal', 'goals'];
 
 // The "Open Journal" button on the Routines page's focus strip: goes to the Journal and says so,
 // with a way back, since the page changes under the user.
-function openJournal(entryId) {
+function openJournal(entryId, back = '#routines') {
   location.hash = '#journal';
   const opened = viewEntry(entryId);
   showToast(opened ? 'Opened your Journal entry.' : 'Opened your Journal.', {
     actionLabel: 'Go back',
     onAction: () => {
       document.querySelector('#entryViewDialog')?.close();
-      location.hash = '#routines';
+      location.hash = back;
     },
   });
 }
+// The "Open in Journal" button after an entry written from a "How did it feel?" prompt.
+document.addEventListener('open-journal-entry', (event) => {
+  dayDialog.close();
+  openJournal(event.detail.id, event.detail.back || '#schedule');
+});
 
 // The "Open routine" button on a session: shows that session's day on the Routines page, with a way
 // back, since the page changes under the user. (Rest and Tournament have no routine.)
@@ -1240,6 +1248,7 @@ document.addEventListener('session-done-change', (event) => {
   const { id, done, syncSteps, x, y } = event.detail;
   const session = sessions.find((candidate) => candidate.id === id);
   if (!session) return;
+  const becameDone = done && !session.done;
   session.done = done;
   if (syncSteps) setSessionStepsDone(session);
   persist();
@@ -1248,6 +1257,7 @@ document.addEventListener('session-done-change', (event) => {
   // The Routines page may be open behind the Today box, so its steps follow the Done box at once.
   if (syncSteps && location.hash === '#routines') renderRoutines();
   if (syncSteps && done) burstConfetti(x, y);
+  if (becameDone) offerReflection(session);
 });
 // The next meal changes as the day goes on, so refresh the small list while the app stays open.
 setInterval(renderTodayTray, 60 * 1000);
