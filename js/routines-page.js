@@ -611,8 +611,11 @@ function loadRoutine(routine) {
   for (const step of stepsOf(librarySession.id)) {
     if (step.video?.kind === 'file') deleteVideo(step.video.id).catch(() => {});
   }
-  setSteps(librarySession.id, routine.steps.map((step) => ({ ...step })), routine.id);
-  ticks = { ...ticks, [librarySession.id]: [] };
+  const loadedSteps = routine.steps.map((step) => ({ ...step }));
+  setSteps(librarySession.id, loadedSteps, routine.id);
+  // A session already marked Done on the Schedule gets its new steps ticked too, so the two screens agree.
+  const markedDone = allSessions().some((session) => session.id === librarySession.id && session.done);
+  ticks = { ...ticks, [librarySession.id]: ticksForDone(loadedSteps, markedDone) };
   persistTicks();
   syncDone(librarySession.id, before);
   adding = null;

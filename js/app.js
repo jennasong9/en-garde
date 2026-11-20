@@ -1245,6 +1245,8 @@ document.addEventListener('session-done-change', (event) => {
   persist();
   renderAll();
   if (dayDialog.open) renderDay();
+  // The Routines page may be open behind the Today box, so its steps follow the Done box at once.
+  if (syncSteps && location.hash === '#routines') renderRoutines();
   if (syncSteps && done) burstConfetti(x, y);
 });
 // The next meal changes as the day goes on, so refresh the small list while the app stays open.
