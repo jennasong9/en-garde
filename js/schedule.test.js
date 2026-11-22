@@ -113,6 +113,7 @@ import {
   moveStart,
   nextSessions,
   sessionsOn,
+  pastWeeks,
   sessionsThisWeek,
   SESSION_TYPES,
   scrollAfterZoom,
@@ -2073,6 +2074,33 @@ test('changing the targets updates every day of this week so far, but not days b
   equal(updated['2026-11-15'], log['2026-11-15']);
   equal(recordWeekMacros(updated, meals, newTargets, '2026-11-20') === updated, true);
   equal(recordWeekMacros({}, [], { protein: null, carb: null, fat: null }, '2026-11-20'), {});
+});
+
+test('past weeks list the weeks before this one, newest first, with sessions planned and done and hours finished', () => {
+  const sessions = [
+    { id: 'a', date: '2026-11-15', time: '09:00', mins: 60, done: true },
+    { id: 'b', date: '2026-11-21', time: '09:00', mins: 90, done: true },
+    { id: 'c', date: '2026-11-17', time: '09:00', mins: 45, done: false },
+    { id: 'd', date: '2026-11-08', time: '09:00', mins: 30, done: true },
+    { id: 'e', date: '2026-11-22', time: '09:00', mins: 60, done: true },
+    { id: 'f', date: '2026-11-16', time: '', mins: 0, done: true },
+  ];
+  // Saturday 2026-11-28: this week is Nov 22 to 28, so the weeks before it are Nov 15-21, Nov 8-14, Nov 1-7.
+  const weeks = pastWeeks(sessions, new Date(2026, 10, 28), 3);
+  equal(weeks.map((week) => [week.startIso, week.endIso]), [['2026-11-15', '2026-11-21'], ['2026-11-08', '2026-11-14'], ['2026-11-01', '2026-11-07']]);
+  equal(weeks.map((week) => [week.planned, week.done]), [[4, 3], [1, 1], [0, 0]]);
+  equal(weeks[0].hours, 2.5);
+  equal(weeks[0].sessions.map((session) => session.id), ['a', 'f', 'c', 'b']);
+  equal(weeks[2].hours, 0);
+});
+
+test('past weeks follow a session being marked done or not, and never include this week', () => {
+  const sessions = [{ id: 'a', date: '2026-11-18', time: '09:00', mins: 60, done: false }, { id: 'b', date: '2026-11-29', time: '09:00', mins: 60, done: true }];
+  const now = new Date(2026, 10, 28);
+  equal(pastWeeks(sessions, now, 1)[0].done, 0);
+  sessions[0].done = true;
+  equal(pastWeeks(sessions, now, 1)[0].done, 1);
+  equal(pastWeeks(sessions, new Date(2026, 10, 29), 1)[0].startIso, '2026-11-22');
 });
 
 const failures = results.filter((r) => r.error);

@@ -135,6 +135,22 @@ export function weekStats(sessions, now) {
   return { planned: thisWeek.length, done: done.length, hours: minutes / 60 };
 }
 
+// The weeks before this one (Sunday to Saturday, like the "This week" ring), newest first, each with
+// the sessions planned and done and the hours finished. Worked out from the sessions each time, so
+// it always agrees with the calendar. A week with no sessions is still listed, with zeros.
+export function pastWeeks(sessions, now, count) {
+  const thisSunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  return Array.from({ length: count }, (_, index) => {
+    const start = new Date(thisSunday.getFullYear(), thisSunday.getMonth(), thisSunday.getDate() - 7 * (index + 1));
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+    const startIso = toIso(start);
+    const endIso = toIso(end);
+    const inWeek = sessions.filter((s) => s.date >= startIso && s.date <= endIso).sort(compareSessions);
+    const done = inWeek.filter((s) => s.done);
+    return { startIso, endIso, planned: inWeek.length, done: done.length, hours: done.reduce((sum, s) => sum + (s.mins || 0), 0) / 60, sessions: inWeek };
+  });
+}
+
 // ---------- calendar views ----------
 
 export const VIEWS = ['month', 'week', '3day', 'day'];

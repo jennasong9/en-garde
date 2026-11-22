@@ -1083,3 +1083,19 @@ form h3 { font-size: 17px; }
 .quick-chip:hover { background: var(--sage-soft); }
 #templateForm { margin-top: 16px; }
 #templatesDialog .btn#templateNew { margin-top: 12px; }
+
+/* Past weeks pop-up: a row per week with its total, opening to that week's sessions */
+.past-weeks { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.past-week { border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--raised); }
+.past-week.empty { opacity: .65; }
+.past-week summary { display: grid; gap: 6px; padding: 12px 14px; cursor: pointer; list-style: none; min-height: 44px; }
+.past-week summary::-webkit-details-marker { display: none; }
+.past-week-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.past-week-count { color: var(--text-dim); font-size: 14px; font-variant-numeric: tabular-nums; }
+.past-week-bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.past-week-fill { display: block; height: 100%; border-radius: 999px; background: var(--sage-deep); }
+.past-week-sessions { list-style: none; margin: 0; padding: 0 14px 12px; display: flex; flex-direction: column; gap: 6px; }
+.past-week-session { width: 100%; display: flex; justify-content: space-between; gap: 12px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.past-week-session:hover, .past-week-session:focus-visible { border-color: var(--sage-deep); }
+.past-week-session span:last-child { color: var(--text-dim); white-space: nowrap; }
+.ring-links { display: flex; flex-wrap: wrap; justify-content: center; column-gap: 8px; }

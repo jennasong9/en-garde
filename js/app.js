@@ -42,6 +42,7 @@ import {
   scrollAfterZoom,
   nextSessions,
   parseIso,
+  pastWeeks,
   sessionsOn,
   sessionsThisWeek,
   shiftAnchor,
@@ -187,6 +188,45 @@ function openCompletedThisWeek() {
   }
   showDialog(weekDialog);
 }
+
+// ---------- past weeks ----------
+const PAST_WEEKS_SHOWN = 8;
+const pastWeeksDialog = $('#pastWeeksDialog');
+
+const shortDay = (iso) => parseIso(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+// One row for each of the last weeks, worked out from the sessions each time it opens, so it agrees
+// with the calendar. A week opens to its sessions; choosing one opens that day to change its status.
+function openPastWeeks() {
+  const weeks = pastWeeks(sessions, new Date(), PAST_WEEKS_SHOWN);
+  $('#pastWeeksList').replaceChildren(...weeks.map((week) => {
+    const hours = String(Math.round(week.hours * 10) / 10);
+    const fill = el('span', { class: 'past-week-fill' });
+    fill.style.width = (week.planned === 0 ? 0 : Math.round((week.done / week.planned) * 100)) + '%';
+    const summary = el('summary', {},
+      el('div', { class: 'past-week-head' },
+        el('b', { text: shortDay(week.startIso) + ' \u2013 ' + shortDay(week.endIso) }),
+        el('span', { class: 'past-week-count', text: week.planned === 0 ? 'No sessions' : week.done + ' of ' + week.planned + ' done \u00b7 ' + hours + ' h' })),
+      el('span', { class: 'past-week-bar', role: 'img', 'aria-label': week.done + ' of ' + week.planned + ' sessions done' }, fill));
+    const details = el('details', { class: 'past-week' + (week.planned === 0 ? ' empty' : '') }, summary);
+    if (week.planned > 0) {
+      details.append(el('ul', { class: 'past-week-sessions' }, ...week.sessions.map((session) => el('li', {}, el('button', {
+        class: 'past-week-session',
+        type: 'button',
+        'aria-label': 'Open ' + longDate(session.date) + ', ' + SESSION_TYPES[session.type].label + (session.done ? ', done' : ', not done'),
+        onclick: () => {
+          pastWeeksDialog.close();
+          openDay(session.date);
+        },
+      }, el('span', { text: SESSION_TYPES[session.type].short + ' \u00b7 ' + describeDay(session.date) }), el('span', { text: session.done ? '\u2713 Done' : 'Not done' }))))));
+    }
+    return details;
+  }));
+  showDialog(pastWeeksDialog);
+}
+$('#pastWeeksBtn').addEventListener('click', openPastWeeks);
+$('#pastWeeksClose').addEventListener('click', () => pastWeeksDialog.close());
+closeOnBackdropClick(pastWeeksDialog);
 
 // ---------- calendar ----------
 function visibleSessionsByDate() {

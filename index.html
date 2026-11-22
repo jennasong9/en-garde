@@ -158,7 +158,10 @@
             </div>
           </div>
           <p class="ring-hours"><b id="statHours">0</b> hours trained</p>
-          <button class="link-btn" id="viewCompletedBtn" type="button">View completed sessions</button>
+          <div class="ring-links">
+            <button class="link-btn" id="viewCompletedBtn" type="button">View completed sessions</button>
+            <button class="link-btn" id="pastWeeksBtn" type="button">Past weeks</button>
+          </div>
         </div>
         </div></div>
       </div>
@@ -437,6 +440,15 @@
       <button class="icon-btn" id="weekClose" type="button" aria-label="Close">&#10005;</button>
     </div>
     <div id="weekList"></div>
+  </dialog>
+
+  <dialog id="pastWeeksDialog" aria-labelledby="pastWeeksTitle">
+    <div class="dialog-head">
+      <h2 id="pastWeeksTitle">Past weeks</h2>
+      <button class="icon-btn" id="pastWeeksClose" type="button" aria-label="Close">&#10005;</button>
+    </div>
+    <p class="tracker-help" id="pastWeeksHelp">Sessions marked Done in each of the last 8 weeks. Tap a week to see its sessions, and a session to open its day and change its status.</p>
+    <div class="past-weeks" id="pastWeeksList"></div>
   </dialog>
 
   <dialog id="trackerDialog" aria-labelledby="trackerTitle">
