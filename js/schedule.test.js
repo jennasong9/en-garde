@@ -124,7 +124,7 @@ import {
 } from './schedule.js';
 
 import { RATING_LADDER, currentRating, earnGoalName, isRatingGoalName, parseRating, ratingGoalConflict, ratingLabel, ratingTargets } from './rating.js';
-import { mealWhen, todayItems, todayLine, weekLine } from './today.js';
+import { lastWeekLine, mealWhen, todayItems, todayLine, weekLine } from './today.js';
 import { checkVideoFile, MAX_VIDEO_BYTES, normalizeVideo, parseYouTubeLink, videoLabel } from './stepvideo.js';
 import { cleanDraft, cleanProfileList, newProfileId, profileSummary, startingData, validateNewProfile } from './profiles.js';
 
@@ -2101,6 +2101,12 @@ test('past weeks follow a session being marked done or not, and never include th
   sessions[0].done = true;
   equal(pastWeeks(sessions, now, 1)[0].done, 1);
   equal(pastWeeks(sessions, new Date(2026, 10, 29), 1)[0].startIso, '2026-11-22');
+});
+
+test('lastWeekLine reads like the This week line, and says when nothing was planned', () => {
+  equal(lastWeekLine({ done: 3, planned: 4, hours: 2.46 }), 'Last week: 3 of 4 sessions \u00b7 2.5 h');
+  equal(lastWeekLine({ done: 1, planned: 1, hours: 1 }), 'Last week: 1 of 1 session \u00b7 1 h');
+  equal(lastWeekLine({ done: 0, planned: 0, hours: 0 }), 'Last week: no sessions');
 });
 
 const failures = results.filter((r) => r.error);

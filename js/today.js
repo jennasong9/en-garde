@@ -22,6 +22,13 @@ export function weekLine({ done, planned, hours }) {
   return 'This week: ' + done + ' of ' + plural(planned, 'session') + ' · ' + String(Math.round(hours * 10) / 10) + ' h';
 }
 
+// Last week's progress, in the same style: "Last week: 3 of 4 sessions · 2.5 h", or "Last week: no
+// sessions" when none were planned.
+export function lastWeekLine({ done, planned, hours }) {
+  if (planned === 0) return 'Last week: no sessions';
+  return weekLine({ done, planned, hours }).replace('This week', 'Last week');
+}
+
 const MINUTES_PER_DAY = 24 * 60;
 const toMinutes = (time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 

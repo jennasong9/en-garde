@@ -1,9 +1,9 @@
 import { $, el } from './dom.js';
 import { DEFAULT_GLASS_GOAL, glassesToday } from './meals.js';
-import { SESSION_TYPES, cleanSessions, formatTime, toIso, weekStats } from './schedule.js';
+import { SESSION_TYPES, cleanSessions, formatTime, pastWeeks, toIso, weekStats } from './schedule.js';
 import { setFoldSummary } from './foldable-cards.js';
 import { loadJson } from './storage.js';
-import { mealWhen, todayItems, todayLine, weekLine } from './today.js';
+import { lastWeekLine, mealWhen, todayItems, todayLine, weekLine } from './today.js';
 
 // The "Today" box at the top of every page: today's sessions with a Done tick, the next meal with a
 // Prepped tick, and a "+1 glass" button. It reads the saved data each time it is drawn, and asks the
@@ -72,6 +72,7 @@ export function renderTodayTray() {
   const goal = Number.isInteger(saved?.goal) && saved.goal >= 1 ? saved.goal : DEFAULT_GLASS_GOAL;
   const glasses = glassesToday(saved ?? {}, toIso(now));
   const week = weekStats(sessions, now);
+  const lastWeek = pastWeeks(sessions, now, 1)[0];
 
   // Once the day's goal is reached the row only reads "5 of 5", with no button to add another glass.
   const water = el('div', { class: 'today-row' }, el('span', { class: 'today-text', text: 'Water \u00b7 ' + glasses + ' of ' + goal }));
@@ -90,7 +91,9 @@ export function renderTodayTray() {
   $('#todayBody').replaceChildren(
     el('div', { class: 'today-items' }, ...itemRows(items)),
     water,
-    el('a', { class: 'today-week', href: '#schedule', text: weekLine({ done: week.done, planned: week.planned, hours: week.hours }) }));
+    el('div', { class: 'today-weeks' },
+      el('a', { class: 'today-week', href: '#schedule', text: weekLine({ done: week.done, planned: week.planned, hours: week.hours }) }),
+      el('a', { class: 'today-week', href: '#schedule', text: lastWeekLine(lastWeek) })));
   setFoldSummary('today', todayLine({
     sessionCount: todaySessions.length,
     doneCount: todaySessions.filter((session) => session.done).length,

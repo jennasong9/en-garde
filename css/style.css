@@ -960,7 +960,7 @@ form h3 { font-size: 17px; }
 .today-empty { margin: 0; min-height: 30px; display: flex; align-items: center; color: var(--text-dim); }
 .today-more, .today-week { font-size: 13px; color: var(--text-dim); text-decoration: none; padding: 2px 0; }
 .today-more:hover, .today-week:hover { color: var(--sage-deep); text-decoration: underline; }
-.today-week { border-top: 1px solid var(--border); margin-top: 2px; padding-top: 4px; }
+.today-weeks { display: flex; flex-direction: column; border-top: 1px solid var(--border); margin-top: 2px; padding-top: 4px; }
 .today-add { flex: 0 0 auto; min-height: 28px; padding: 0 12px; }
 
 /* On wide screens the Today box grows sideways instead of taller: sessions and the meal on the left,
@@ -970,7 +970,7 @@ form h3 { font-size: 17px; }
   .today-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 28px; }
   .today-items { grid-column: 1; grid-row: 1 / span 2; }
   .today-body > .today-row { grid-column: 2; grid-row: 1; }
-  .today-body > .today-week { grid-column: 2; grid-row: 2; align-self: center; border-top: 0; margin: 0; padding: 0; }
+  .today-body > .today-weeks { grid-column: 2; grid-row: 2; align-self: center; border-top: 0; margin: 0; padding: 0; }
 }
 
 /* ===== Rating strip on the Goals page ===== */
