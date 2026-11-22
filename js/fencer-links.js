@@ -4,6 +4,8 @@ import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
 import { loadJson, saveJson } from './storage.js';
 
 const FENCING_TIME_LIVE = 'https://www.fencingtimelive.com';
+const USA_FENCING_DASHBOARD = 'https://member.usafencing.org/dashboards';
+const USA_FENCING_TOURNAMENTS = 'https://member.usafencing.org/search/tournaments';
 
 const trackerDialog = $('#trackerDialog');
 
@@ -17,8 +19,8 @@ function externalLink(href, text) {
   return el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text + ' ', el('span', { class: 'link-arrow', text: '↗' }));
 }
 
-// The links under the fencer's name: their FencingTracker profile (once connected) and
-// FencingTimeLive, which is the same for everyone.
+// The links in Settings: their FencingTracker profile (once connected), then FencingTimeLive and
+// the USA Fencing dashboard and Tournament Browser, which are the same for everyone.
 function renderLink() {
   const timeLive = externalLink(FENCING_TIME_LIVE, 'Go to FencingTimeLive');
   const tracker = link === ''
@@ -26,7 +28,9 @@ function renderLink() {
     : [
       externalLink(link, 'My FencingTracker profile'),
     ];
-  $('#fencerLinks').replaceChildren(...tracker, timeLive);
+  $('#fencerLinks').replaceChildren(...tracker, timeLive,
+    externalLink(USA_FENCING_DASHBOARD, 'My USA Fencing dashboard'),
+    externalLink(USA_FENCING_TOURNAMENTS, 'USA Fencing Tournament Browser'));
 }
 
 function openDialog() {
