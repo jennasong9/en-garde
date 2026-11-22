@@ -73,9 +73,10 @@ export function renderTodayTray() {
   const glasses = glassesToday(saved ?? {}, toIso(now));
   const week = weekStats(sessions, now);
 
-  const water = el('div', { class: 'today-row' },
-    el('span', { class: 'today-text', text: 'Water · ' + glasses + ' of ' + goal }),
-    el('button', {
+  // Once the day's goal is reached the row only reads "5 of 5", with no button to add another glass.
+  const water = el('div', { class: 'today-row' }, el('span', { class: 'today-text', text: 'Water \u00b7 ' + glasses + ' of ' + goal }));
+  if (glasses < goal) {
+    water.append(el('button', {
       class: 'btn ghost small today-add',
       type: 'button',
       text: '+1 glass',
@@ -84,7 +85,7 @@ export function renderTodayTray() {
         ask('water-add', { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
       },
     }));
-  water.querySelector('button').disabled = glasses >= goal;
+  }
 
   $('#todayBody').replaceChildren(
     el('div', { class: 'today-items' }, ...itemRows(items)),
