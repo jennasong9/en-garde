@@ -187,10 +187,10 @@ export function recordMacros(log, iso, totals, targets) {
 }
 
 // Brings the history up to date for every day of this meal-plan week (Monday to Sunday) up to
-// `todayIso`, since the plan's meals can be ticked on a day that has already passed. Today is
-// recorded against the current targets; an earlier day keeps the targets it was recorded with (or
-// the current ones if it had none). Nothing is saved for a day with no targets and no earlier
-// record, nor for an earlier day with no prepped meals. Returns `log` itself when nothing changed.
+// `todayIso`, against the current targets, so a day that has passed follows both its meals being
+// ticked and the targets being changed, as the plan above it does. Days before this week keep what
+// was recorded. Nothing is saved for a day with no targets and no earlier record, nor for an earlier
+// day with no prepped meals. Returns `log` itself when nothing changed.
 export function recordWeekMacros(log, meals, targets, todayIso) {
   const [year, month, dayOfMonth] = todayIso.split('-').map(Number);
   const hasTargets = MACROS.some((macro) => targets[macro]);
@@ -203,9 +203,8 @@ export function recordWeekMacros(log, meals, targets, todayIso) {
     if (!saved && !hasTargets) continue;
     // An earlier day with nothing prepped and no record stays blank ("nothing recorded") instead of showing 0%.
     if (!saved && back > 0 && !meals.some((meal) => meal.prepped && meal.day === date.getDay())) continue;
-    const dayTargets = back === 0 ? targets : saved?.targets ?? targets;
-    const entry = recordMacros({}, iso, preppedMacroTotals(meals, date.getDay()), dayTargets)[iso];
-    if (JSON.stringify(saved) !== JSON.stringify(entry)) updated = recordMacros(updated, iso, entry, dayTargets);
+    const entry = recordMacros({}, iso, preppedMacroTotals(meals, date.getDay()), targets)[iso];
+    if (JSON.stringify(saved) !== JSON.stringify(entry)) updated = recordMacros(updated, iso, entry, targets);
   }
   return updated;
 }

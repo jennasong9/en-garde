@@ -2058,14 +2058,20 @@ test('ticking a meal on a day that has passed this week updates that day in the 
   equal(Object.keys(log).includes('2026-11-15'), false);
 });
 
-test('an earlier day keeps its own targets while today follows the current ones, and an unchanged week saves nothing', () => {
+test('changing the targets updates every day of this week so far, but not days before this week, and an unchanged week saves nothing', () => {
   const oldTargets = { protein: 100, carb: 200, fat: 50 };
   const newTargets = { protein: 150, carb: 250, fat: 60 };
-  const log = { '2026-11-19': { protein: 100, carb: 200, fat: 50, targets: oldTargets }, '2026-11-20': { protein: 0, carb: 0, fat: 0, targets: oldTargets } };
-  const updated = recordWeekMacros(log, [{ id: 'a', day: 4, prepped: true, protein: 90, carb: 100, fat: 10 }], newTargets, '2026-11-20');
-  equal(updated['2026-11-19'], { protein: 90, carb: 100, fat: 10, targets: oldTargets });
+  const meals = [{ id: 'a', day: 4, prepped: true, protein: 90, carb: 100, fat: 10 }];
+  const log = {
+    '2026-11-15': { protein: 80, carb: 80, fat: 80, targets: oldTargets },
+    '2026-11-19': { protein: 90, carb: 100, fat: 10, targets: oldTargets },
+    '2026-11-20': { protein: 0, carb: 0, fat: 0, targets: oldTargets },
+  };
+  const updated = recordWeekMacros(log, meals, newTargets, '2026-11-20');
+  equal(updated['2026-11-19'].targets, newTargets);
   equal(updated['2026-11-20'].targets, newTargets);
-  equal(recordWeekMacros(updated, [{ id: 'a', day: 4, prepped: true, protein: 90, carb: 100, fat: 10 }], newTargets, '2026-11-20') === updated, true);
+  equal(updated['2026-11-15'], log['2026-11-15']);
+  equal(recordWeekMacros(updated, meals, newTargets, '2026-11-20') === updated, true);
   equal(recordWeekMacros({}, [], { protein: null, carb: null, fat: null }, '2026-11-20'), {});
 });
 
