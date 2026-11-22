@@ -34,8 +34,7 @@ import {
   parseGrams,
   parseKcal,
   placeMeal,
-  preppedMacroTotals,
-  recordMacros,
+  recordWeekMacros,
   removeFromHistory,
   searchHistory,
 } from './meals.js';
@@ -178,14 +177,12 @@ document.addEventListener('meal-prepped-change', (event) => {
   if (!wasDone && allPrepped(dayTotals(meals, meal.day))) burstConfetti(x, y);
 });
 
-// Saves today's prepped grams against today's targets when they changed. Nothing is saved for a
-// day with no targets and no earlier record.
-function recordTodayMacros() {
-  const iso = toIso(new Date());
-  const entry = recordMacros({}, iso, preppedMacroTotals(meals, new Date().getDay()), macroTargets)[iso];
-  if (!macroLog[iso] && !MACROS.some((macro) => macroTargets[macro])) return;
-  if (JSON.stringify(macroLog[iso]) === JSON.stringify(entry)) return;
-  macroLog = recordMacros(macroLog, iso, entry, macroTargets);
+// Saves each day's prepped grams for this week so far (Monday to today) against its targets, so
+// ticking a meal on a day that has passed updates that day's bars too.
+function recordWeekMacroHistory() {
+  const updated = recordWeekMacros(macroLog, meals, macroTargets, toIso(new Date()));
+  if (updated === macroLog) return;
+  macroLog = updated;
   saveJson('macroLog', macroLog);
 }
 
@@ -228,7 +225,7 @@ function renderMacroWeek() {
 export function renderNutrition() {
   renderTodayTray();
   renderMacroTargets();
-  recordTodayMacros();
+  recordWeekMacroHistory();
   renderMacroWeek();
   const today = new Date().getDay();
   $('#mealGrid').replaceChildren(...WEEK_ORDER.map((day) => dayColumn(DAY_NAMES[day], day, day === today)), historyPanel());

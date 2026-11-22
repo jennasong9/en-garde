@@ -79,6 +79,7 @@ import {
   macroWeekHistory,
   preppedMacroTotals,
   recordMacros,
+  recordWeekMacros,
   recordGlasses,
   weekHistory,
   hasCustomOrder,
@@ -2041,6 +2042,31 @@ test('a template needs a new name and new details, a sensible length and room in
   const full = Array.from({ length: MAX_TEMPLATES }, (_, index) => templateFixture({ id: 'x' + index, name: 'T' + index, mins: index }));
   equal(validateTemplate('New', { ...fields, mins: 99 }, full), 'You have ' + MAX_TEMPLATES + ' templates. Delete one to add another.');
   equal(validateTemplate('T0', { ...fields, mins: 0, location: 'Elsewhere' }, full, 'x0'), null);
+});
+
+test('ticking a meal on a day that has passed this week updates that day in the macro history', () => {
+  const targets = { protein: 100, carb: 200, fat: 50 };
+  const meal = (day, prepped) => ({ id: 'm' + day + prepped, day, prepped, protein: 100, carb: 200, fat: 50 });
+  // Friday 2026-11-20: Thursday's meal was ticked afterwards. Thursday and today are recorded; earlier
+  // days with nothing prepped stay blank.
+  const log = recordWeekMacros({}, [meal(4, true), meal(1, false)], targets, '2026-11-20');
+  equal(Object.keys(log), ['2026-11-19', '2026-11-20']);
+  equal(log['2026-11-19'], { protein: 100, carb: 200, fat: 50, targets });
+  equal(log['2026-11-20'], { protein: 0, carb: 0, fat: 0, targets });
+  // Nothing is recorded for the weekend still to come, or for the week before.
+  equal(Object.keys(log).includes('2026-11-21'), false);
+  equal(Object.keys(log).includes('2026-11-15'), false);
+});
+
+test('an earlier day keeps its own targets while today follows the current ones, and an unchanged week saves nothing', () => {
+  const oldTargets = { protein: 100, carb: 200, fat: 50 };
+  const newTargets = { protein: 150, carb: 250, fat: 60 };
+  const log = { '2026-11-19': { protein: 100, carb: 200, fat: 50, targets: oldTargets }, '2026-11-20': { protein: 0, carb: 0, fat: 0, targets: oldTargets } };
+  const updated = recordWeekMacros(log, [{ id: 'a', day: 4, prepped: true, protein: 90, carb: 100, fat: 10 }], newTargets, '2026-11-20');
+  equal(updated['2026-11-19'], { protein: 90, carb: 100, fat: 10, targets: oldTargets });
+  equal(updated['2026-11-20'].targets, newTargets);
+  equal(recordWeekMacros(updated, [{ id: 'a', day: 4, prepped: true, protein: 90, carb: 100, fat: 10 }], newTargets, '2026-11-20') === updated, true);
+  equal(recordWeekMacros({}, [], { protein: null, carb: null, fat: null }, '2026-11-20'), {});
 });
 
 const failures = results.filter((r) => r.error);
