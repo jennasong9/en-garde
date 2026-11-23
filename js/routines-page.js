@@ -633,24 +633,28 @@ function renderRoutineList() {
   }));
 }
 
-function loadRoutine(routine) {
-  const before = sessionProgress(stepsOf(librarySession.id), ticks[librarySession.id] || []);
-  for (const step of stepsOf(librarySession.id)) {
+// Loads a routine into `target` (default: the session whose library is open). `keepOpen` leaves the
+// Use pop-up showing so the same routine can go into more sessions.
+function loadRoutine(routine, target = librarySession, keepOpen = false) {
+  const before = sessionProgress(stepsOf(target.id), ticks[target.id] || []);
+  for (const step of stepsOf(target.id)) {
     if (step.video?.kind === 'file') deleteVideo(step.video.id).catch(() => {});
   }
   const loadedSteps = routine.steps.map((step) => ({ ...step }));
-  setSteps(librarySession.id, loadedSteps, routine.id);
+  setSteps(target.id, loadedSteps, routine.id);
   // A session already marked Done on the Schedule gets its new steps ticked too, so the two screens agree.
-  const markedDone = allSessions().some((session) => session.id === librarySession.id && session.done);
-  ticks = { ...ticks, [librarySession.id]: ticksForDone(loadedSteps, markedDone) };
+  const markedDone = allSessions().some((session) => session.id === target.id && session.done);
+  ticks = { ...ticks, [target.id]: ticksForDone(loadedSteps, markedDone) };
   persistTicks();
-  syncDone(librarySession.id, before);
+  syncDone(target.id, before);
   adding = null;
   editing = null;
   confirmingRemove = null;
   confirmingRoutine = null;
-  loadRoutineDialog.close();
-  useRoutineDialog.close();
+  if (!keepOpen) {
+    loadRoutineDialog.close();
+    useRoutineDialog.close();
+  }
   renderRoutines();
   showToast('Loaded "' + routine.name + '" (' + routineSummary(routine) + ').');
 }
@@ -681,6 +685,9 @@ let deletingRoutineId = null;
 // The routine whose "Use" pop-up is open, and the session waiting for "Yes, replace".
 let usingRoutine = null;
 let replacingSessionId = null;
+// Sessions loaded since the Use pop-up opened, and the date of the latest one.
+let loadedHere = new Set();
+let lastLoadedDate = null;
 
 // Shows the Saved routines half with one routine's steps open and in view (used by search).
 export function showSavedRoutine(id) {
@@ -792,6 +799,8 @@ function deleteSavedRoutine(type, routine) {
 function openUseRoutine(type, routine) {
   usingRoutine = { type, routine };
   replacingSessionId = null;
+  loadedHere = new Set();
+  lastLoadedDate = null;
   $('#useRoutineTitle').textContent = 'Use "' + routine.name + '"';
   renderUseRoutineList();
   showDialog(useRoutineDialog);
@@ -813,15 +822,24 @@ function renderUseRoutineList() {
     const when = [day, session.time ? formatTime(session.time) : 'All day', session.location].filter(Boolean).join(' \u00b7 ');
     const hasSteps = stepsOf(session.id).length > 0;
     const use = () => {
-      librarySession = session;
-      loadRoutine(routine);
-      view = 'day';
-      goToDay(session.date);
+      loadRoutine(routine, session, true);
+      loadedHere.add(session.id);
+      lastLoadedDate = session.date;
+      replacingSessionId = null;
+      renderUseRoutineList();
     };
     const row = el('li', { class: 'plan-item' }, el('div', { class: 'plan-info' },
       el('b', { text: when }),
       el('span', { text: hasSteps ? routineSummary({ steps: stepsOf(session.id) }) + ' now' : 'No steps yet' })));
-    if (replacingSessionId === session.id) {
+    if (loadedHere.has(session.id)) {
+      row.append(el('div', { class: 'plan-buttons' }, el('button', {
+        class: 'btn ghost small loaded',
+        type: 'button',
+        text: 'Loaded \u2713',
+        disabled: true,
+        'aria-label': 'Loaded into the session on ' + when,
+      })));
+    } else if (replacingSessionId === session.id) {
       row.append(el('div', { class: 'plan-confirm' },
         el('span', { text: 'Replace its steps?' }),
         el('button', { class: 'btn small', type: 'button', text: 'Yes, replace', onclick: use }),
@@ -841,6 +859,15 @@ function renderUseRoutineList() {
 
 closeOnBackdropClick(useRoutineDialog);
 $('#useRoutineClose').addEventListener('click', () => useRoutineDialog.close());
+$('#useRoutineDone').addEventListener('click', () => useRoutineDialog.close());
+// Finishing lands on the last session loaded, so the new steps are in view.
+useRoutineDialog.addEventListener('close', () => {
+  if (!lastLoadedDate) return;
+  const date = lastLoadedDate;
+  lastLoadedDate = null;
+  view = 'day';
+  goToDay(date);
+});
 
 // ---------- guided run: one step at a time, with a timer ----------
 const runDialog = $('#runDialog');
