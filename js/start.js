@@ -10,6 +10,7 @@ import {
   saveProfileList,
   setActiveProfile,
 } from './storage.js';
+import { lookupUrl, parseFencerLink, readProfilePage } from './fencingtracker.js';
 import { cleanDraft, cleanProfileList, newProfileId, profileSummary, startingData, validateNewProfile } from './profiles.js';
 
 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
@@ -127,6 +128,44 @@ function restoreDraft() {
   return true;
 }
 
+// Reads the pasted FencingTracker link and fills in what the page shows. Anything the page does
+// not show is left as it is, and everything stays editable before the profile is made.
+async function lookUpTracker() {
+  const status = $('#wLookupStatus');
+  const button = $('#wLookup');
+  const checked = parseFencerLink($('#wTracker').value);
+  status.classList.toggle('error', Boolean(checked.error));
+  if (checked.error) {
+    status.textContent = checked.error;
+    return;
+  }
+  $('#wTracker').value = checked.url;
+  button.disabled = true;
+  status.classList.remove('error');
+  status.textContent = 'Looking up your profile\u2026';
+  try {
+    const response = await fetch(lookupUrl(checked.url), { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error('status ' + response.status);
+    const found = readProfilePage(await response.text());
+    if (found.name === '') throw new Error('no name on the page');
+    $('#wName').value = found.name.slice(0, 60);
+    if (found.club) $('#wClub').value = found.club.slice(0, 80);
+    if (found.rating) $('#wRating').value = found.rating;
+    if (found.weapon) {
+      const group = $('#wWeapon');
+      chooseInGroup(group, [...group.querySelectorAll('[role="radio"]')].find((option) => option.dataset.value === found.weapon));
+    }
+    const missing = [['weapon', found.weapon], ['club', found.club], ['rating', found.rating]].filter(([, value]) => !value).map(([label]) => label);
+    status.textContent = 'Filled in from your profile. Please check it' + (missing.length ? ' and add your ' + missing.join(' and ') + ' yourself' : '') + '.';
+  } catch (error) {
+    status.classList.add('error');
+    status.textContent = 'Could not read that profile just now. Check the link and your connection, or type your details below.';
+  } finally {
+    button.disabled = false;
+    saveDraft();
+  }
+}
+
 function createProfile(event) {
   event.preventDefault();
   const result = validateNewProfile(formValues());
@@ -166,6 +205,7 @@ function showWelcome() {
     $('#wName').focus();
   });
   $('#wNewForm').addEventListener('submit', createProfile);
+  $('#wLookup').addEventListener('click', lookUpTracker);
   $('#wNewForm').addEventListener('input', saveDraft);
   $('#wNewForm').addEventListener('click', saveDraft);
   // A refresh in the middle of setup brings back what was typed, and shows the form again.

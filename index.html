@@ -47,6 +47,15 @@
       <form id="wNewForm" novalidate>
         <h2>Create your profile</h2>
         <p class="welcome-guide">This takes about a minute. Only your name and weapon are needed; everything else is optional, and you can change any of it later in Settings (the gear icon). It is all saved on this device, and what you type here is kept if you refresh.</p>
+        <div class="field" id="wTrackerField">
+          <label for="wTracker">FencingTracker profile link <small>(optional)</small></label>
+          <small class="welcome-hint">Have a FencingTracker profile? Paste its link and we fill in your name, club, weapon and rating for you to check.</small>
+          <div class="lookup-row">
+            <input type="text" id="wTracker" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://fencingtracker.com/p/123456/Your-Name">
+            <button class="btn" id="wLookup" type="button">Fill in my details</button>
+          </div>
+          <p class="lookup-status" id="wLookupStatus" role="status"></p>
+        </div>
         <label class="field">Name
           <input type="text" id="wName" maxlength="60" autocomplete="off" required>
           <small class="welcome-hint">Shown at the top of every page.</small>
@@ -71,9 +80,6 @@
             <small class="welcome-hint">Leave blank if you are unrated. The Goals page uses it.</small>
           </label>
         </div>
-        <label class="field">FencingTracker profile link
-          <input type="text" id="wTracker" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://fencingtracker.com/p/123456/Your-Name">
-        </label>
 
         <h3>Preferences <small>(optional, change any time in Settings)</small></h3>
         <div class="field" role="radiogroup" aria-label="Look" id="wTheme">

@@ -908,6 +908,11 @@ form h3 { font-size: 17px; }
 .welcome-card h3 small { font-weight: 400; color: var(--text-dim); }
 .welcome-lead { margin: 0; color: var(--text-dim); }
 .welcome-guide { margin: 0; padding: 10px 12px; border-radius: var(--radius-s); background: var(--sage-soft); color: var(--text); font-size: 14px; }
+.lookup-row { display: flex; gap: 8px; margin-top: 6px; }
+.lookup-row input { flex: 1; min-width: 0; }
+.lookup-status { margin: 6px 0 0; min-height: 1.2em; font-size: 13px; color: var(--text-dim); }
+.lookup-status.error { color: var(--danger-text); }
+@media (max-width: 520px) { .lookup-row { flex-direction: column; } }
 .welcome-hint { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--text-dim); }
 .welcome-card form, .welcome-card section { display: flex; flex-direction: column; gap: 14px; }
 .welcome-card form[hidden], .welcome-card section[hidden] { display: none; }

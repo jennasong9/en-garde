@@ -20,7 +20,7 @@ import {
 import { MAX_TEMPLATES, cleanTemplates, defaultTemplateName, fieldsFromTemplate, validateTemplate } from './templates.js';
 import { MAX_PER_GROUP, searchAll } from './search.js';
 import { firstUnfinishedIndex, formatClock, moveStep, stepCounter } from './runmode.js';
-import { parseFencerLink, parseOptionalFencerLink } from './fencingtracker.js';
+import { lookupUrl, parseFencerLink, parseOptionalFencerLink, readProfilePage } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import {
   MAX_STEPS,
@@ -2107,6 +2107,29 @@ test('lastWeekLine reads like the This week line, and says when nothing was plan
   equal(lastWeekLine({ done: 3, planned: 4, hours: 2.46 }), 'Last week: 3 of 4 sessions \u00b7 2.5 h');
   equal(lastWeekLine({ done: 1, planned: 1, hours: 1 }), 'Last week: 1 of 1 session \u00b7 1 h');
   equal(lastWeekLine({ done: 0, planned: 0, hours: 0 }), 'Last week: no sessions');
+});
+
+const PROFILE_PAGE = `<h1>Jenna Song</h1><div class="person-hero__clubs"><a class="person-hero__club-link" href="/club/1">The Point Fencing Club &amp; School</a></div>
+<table><tr data-ranking-search="ratingFoil B26"><td>Foil</td><td>B26</td><td>Sep 1, 2026</td></tr>
+<tr data-ranking-search="x"><td>Foil</td><td>C25</td><td>Aug 23, 2025</td></tr></table>`;
+
+test('a FencingTracker profile page gives the name, club, weapon and newest rating', () => {
+  const found = readProfilePage(PROFILE_PAGE);
+  equal(found, { name: 'Jenna Song', club: 'The Point Fencing Club & School', weapon: 'Foil', rating: 'B26' });
+});
+
+test('the newest rating wins whatever the row order, and another weapon is read too', () => {
+  const found = readProfilePage('<h1>A B</h1><table><tr data-ranking-search="a"><td>Foil</td><td>C25</td><td>Aug 23, 2025</td></tr><tr data-ranking-search="b"><td>Sabre</td><td>D27</td><td>Sep 3, 2027</td></tr></table>');
+  equal([found.weapon, found.rating], ['Sabre', 'D27']);
+});
+
+test('a profile with no club or rating leaves them blank, and a page with nothing gives all blanks', () => {
+  equal(readProfilePage('<h1>New Fencer</h1>'), { name: 'New Fencer', club: '', weapon: '', rating: '' });
+  equal(readProfilePage('<p>not a profile</p>'), { name: '', club: '', weapon: '', rating: '' });
+});
+
+test('the lookup address is always the plain fencingtracker.com one', () => {
+  equal(lookupUrl('https://www.fencingtracker.com/p/1/A-B'), 'https://fencingtracker.com/p/1/A-B');
 });
 
 const failures = results.filter((r) => r.error);
