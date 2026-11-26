@@ -955,6 +955,8 @@ form h3 { font-size: 17px; }
 .today-tray .fold-inner { padding-top: 0; }
 .today-body { display: flex; flex-direction: column; font-size: 14px; }
 .today-items { display: flex; flex-direction: column; }
+.today-side { display: flex; flex-direction: column; min-width: 0; }
+.today-label { margin: 4px 0 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); }
 .today-row { display: flex; align-items: center; gap: 10px; min-height: 30px; cursor: pointer; }
 .today-row input { flex: 0 0 auto; width: 20px; height: 20px; margin: 0; accent-color: var(--sage-deep); cursor: pointer; }
 .today-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -968,14 +970,14 @@ form h3 { font-size: 17px; }
 .today-weeks { display: flex; flex-direction: column; border-top: 1px solid var(--border); margin-top: 2px; padding-top: 4px; }
 .today-add { flex: 0 0 auto; min-height: 28px; padding: 0 12px; }
 
-/* On wide screens the Today box grows sideways instead of taller: sessions and the meal on the left,
-   water and the week's numbers on the right. */
+/* On wide screens the Today box grows sideways instead of taller: sessions and the week's numbers
+   (which count sessions) on the left, and meals and water on the right. */
 @media (min-width: 900px) {
   .today-tray { flex-basis: 560px; }
-  .today-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 28px; }
-  .today-items { grid-column: 1; grid-row: 1 / span 2; }
-  .today-body > .today-row { grid-column: 2; grid-row: 1; }
-  .today-body > .today-weeks { grid-column: 2; grid-row: 2; align-self: center; border-top: 0; margin: 0; padding: 0; }
+  .today-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; align-items: start; }
+  .today-body > .today-items { grid-column: 1; grid-row: 1; }
+  .today-body > .today-side { grid-column: 2; grid-row: 1 / span 2; }
+  .today-body > .today-weeks { grid-column: 1; grid-row: 2; border-top: 0; margin: 4px 0 0; padding: 0; }
 }
 
 /* ===== Rating strip on the Goals page ===== */

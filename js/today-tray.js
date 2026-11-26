@@ -53,13 +53,14 @@ function itemRow(item) {
     el('span', { class: 'today-text', text: meal.name }));
 }
 
-function itemRows(items) {
-  if (items.length === 0) return [el('p', { class: 'today-empty', text: 'Nothing planned today' })];
+// A list of rows with a small title above it. Long lists show a few and link to the Schedule.
+function itemList(title, items, emptyText) {
   const rows = items.slice(0, MAX_ROWS_SHOWN).map(itemRow);
   if (items.length > MAX_ROWS_SHOWN) {
-    rows.push(el('a', { class: 'today-more', href: '#schedule', text: '+' + (items.length - MAX_ROWS_SHOWN) + ' more today' }));
+    rows.push(el('a', { class: 'today-more', href: '#schedule', text: '+' + (items.length - MAX_ROWS_SHOWN) + ' more' }));
   }
-  return rows;
+  if (items.length === 0 && emptyText) rows.push(el('p', { class: 'today-empty', text: emptyText }));
+  return el('div', { class: 'today-items' }, el('h3', { class: 'today-label', text: title }), ...rows);
 }
 
 export function renderTodayTray() {
@@ -88,9 +89,13 @@ export function renderTodayTray() {
     }));
   }
 
+  // Sessions and the week's numbers (which count sessions) go on the left; meals and water on the right.
+  const meals = items.filter((item) => item.kind === 'meal');
   $('#todayBody').replaceChildren(
-    el('div', { class: 'today-items' }, ...itemRows(items)),
-    water,
+    itemList('Sessions', items.filter((item) => item.kind === 'session'), 'No sessions today'),
+    el('div', { class: 'today-side' },
+      itemList('Meals', meals, 'No meals planned'),
+      water),
     el('div', { class: 'today-weeks' },
       el('a', { class: 'today-week', href: '#schedule', text: weekLine({ done: week.done, planned: week.planned, hours: week.hours }) }),
       el('a', { class: 'today-week', href: '#schedule', text: lastWeekLine(lastWeek) })));
