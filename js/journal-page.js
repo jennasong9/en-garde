@@ -136,22 +136,33 @@ function renderViewSwitch() {
   })), '[aria-pressed="true"]');
 }
 
+// The range toggle and the chart live as long as the page does, so the green pill can slide from
+// 30 to 90 days (a rebuilt toggle would start over with no slide) and the chart can fade in.
+let trendRange = null;
+let trendChart = null;
+
 function renderTrendsView() {
   const box = $('#journalTrends');
-  const range = el('div', { class: 'view-switch', role: 'group', 'aria-label': 'Trend range' });
-  setSwitchButtons(range, TREND_RANGES.map(({ days, label }) => el('button', {
+  if (!trendRange) {
+    trendRange = el('div', { class: 'view-switch', role: 'group', 'aria-label': 'Trend range' });
+    trendChart = el('div');
+    box.replaceChildren(trendRange, trendChart);
+  }
+  setSwitchButtons(trendRange, TREND_RANGES.map(({ days, label }) => el('button', {
     class: 'view-btn',
     type: 'button',
     text: label,
     'aria-pressed': String(days === trendDays),
     onclick: () => {
+      if (days === trendDays) return;
       trendDays = days;
       renderJournal();
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        trendChart.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 250, easing: 'ease' });
+      }
     },
   })), '[aria-pressed="true"]');
-  const chart = el('div');
-  renderTrends(chart, entries, toIso(new Date()), trendDays);
-  box.replaceChildren(range, chart);
+  renderTrends(trendChart, entries, toIso(new Date()), trendDays);
 }
 
 function renderFeelingFilters() {
