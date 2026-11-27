@@ -497,7 +497,8 @@ textarea { min-height: 76px; resize: vertical; }
 .now-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--clay); pointer-events: none; z-index: 2; }
 .now-line::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--clay); }
 
-.page-nav { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 24px; border-radius: 999px; background: var(--surface-2); }
+/* The tab row stays at the top of the screen while the page scrolls under it. */
+.page-nav { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 24px; border-radius: 999px; background: var(--surface-2); position: sticky; top: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0, 0, 0, .18); }
 .page-link { min-height: 40px; padding: 0 20px; display: inline-flex; align-items: center; border-radius: 999px; color: var(--text-dim); font-weight: 500; text-decoration: none; }
 .page-link:hover { color: var(--sage-deep); }
 .page-link[aria-current="page"] { background: var(--sage-deep); color: var(--on-accent); }

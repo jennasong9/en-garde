@@ -12,11 +12,17 @@ const STARTS_FOLDED = ['nextUp', 'thisWeek', 'macros', 'hydration'];
 const saved = loadJson('foldedCards', null);
 const folded = new Set(Array.isArray(saved) ? saved : STARTS_FOLDED);
 
+// The Today box in the header takes a lot of a phone screen, so on a phone it starts as its
+// one-line summary. Once it has been opened or folded by hand that choice wins, on any screen.
+const onPhone = window.matchMedia('(max-width: 640px)');
+const todayChoice = loadJson('todayBoxChoice', null);
+const todayStartsFolded = () => (todayChoice === 'open' ? false : todayChoice === 'folded' ? true : folded.has('today') || onPhone.matches);
+
 export function initFoldableCards() {
   for (const card of document.querySelectorAll('.foldable')) {
     const key = card.dataset.fold;
     const toggle = card.querySelector('.fold-title');
-    const startsFolded = folded.has(key);
+    const startsFolded = key === 'today' ? todayStartsFolded() : folded.has(key);
     // Put each card in its saved state without sliding, then allow the sliding for later presses.
     card.classList.add('fold-init');
     card.classList.toggle('collapsed', startsFolded);
@@ -24,9 +30,13 @@ export function initFoldableCards() {
     toggle.setAttribute('aria-expanded', String(!startsFolded));
     toggle.addEventListener('click', () => {
       const folding = !card.classList.contains('collapsed');
-      if (folding) folded.add(key);
-      else folded.delete(key);
-      saveJson('foldedCards', [...folded]);
+      if (key === 'today') {
+        saveJson('todayBoxChoice', folding ? 'folded' : 'open');
+      } else {
+        if (folding) folded.add(key);
+        else folded.delete(key);
+        saveJson('foldedCards', [...folded]);
+      }
       setFolded(card, toggle, folding);
     });
   }
