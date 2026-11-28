@@ -3,14 +3,13 @@ import { loadJson, saveJson } from './storage.js';
 
 // Cards at the top of a page whose body can be folded away, leaving the title and a one-line
 // summary, so the main part of the page (the calendar, the meal plan) comes first. Which cards are
-// folded is remembered on this device; before anything is saved they all start folded.
+// folded is remembered on this device; before anything is saved they all start open, so a new
+// person sees everything.
 // Markup: <div class="card foldable" data-fold="name"> <button class="fold-title">...</button>
 // <span class="fold-summary"></span> <div class="fold"><div class="fold-inner">...</div></div> </div>
 
-const STARTS_FOLDED = ['nextUp', 'thisWeek', 'macros', 'hydration'];
-
 const saved = loadJson('foldedCards', null);
-const folded = new Set(Array.isArray(saved) ? saved : STARTS_FOLDED);
+const folded = new Set(Array.isArray(saved) ? saved : []);
 
 // The Today box in the header takes a lot of a phone screen, so on a phone it starts as its
 // one-line summary. Once it has been opened or folded by hand that choice wins, on any screen.
