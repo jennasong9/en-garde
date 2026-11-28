@@ -20,6 +20,7 @@ import {
 import { MAX_TEMPLATES, cleanTemplates, defaultTemplateName, fieldsFromTemplate, validateTemplate } from './templates.js';
 import { MAX_PER_GROUP, searchAll } from './search.js';
 import { firstUnfinishedIndex, formatClock, moveStep, stepCounter } from './runmode.js';
+import { legacyKeyNames } from './storage.js';
 import { lookupUrl, parseFencerLink, parseOptionalFencerLink, readProfilePage } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
 import {
@@ -2130,6 +2131,12 @@ test('a profile with no club or rating leaves them blank, and a page with nothin
 
 test('the lookup address is always the plain fencingtracker.com one', () => {
   equal(lookupUrl('https://www.fencingtracker.com/p/1/A-B'), 'https://fencingtracker.com/p/1/A-B');
+});
+
+test('old pre-profiles saved names are found, and profile data and other sites\' data are not', () => {
+  const names = ['engarde_sessions', 'engarde_profile', 'engarde_acct.list', 'engarde_acct.anatest.sessions', 'other_key'];
+  equal(legacyKeyNames(names), ['engarde_sessions', 'engarde_profile']);
+  equal(legacyKeyNames(['engarde_acct.active']), []);
 });
 
 const failures = results.filter((r) => r.error);

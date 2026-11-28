@@ -65,18 +65,32 @@ export function deleteProfileData(id) {
   }
 }
 
+// The saved names from before profiles existed: they start with `engarde_` but not with the
+// profile space `engarde_acct.`. Pure, so it can be tested without touching real storage.
+export function legacyKeyNames(names) {
+  return names.filter((name) => name.startsWith(ROOT) && !name.startsWith(ACCOUNT_ROOT));
+}
+
 // Data saved before profiles existed lives directly under `engarde_`. Returns it as
 // { key: value }, or an empty object when there is none.
 export function legacyData() {
   const found = {};
   try {
-    for (const name of Object.keys(localStorage)) {
-      if (name.startsWith(ROOT) && !name.startsWith(ACCOUNT_ROOT)) {
-        found[name.slice(ROOT.length)] = JSON.parse(localStorage.getItem(name));
-      }
+    for (const name of legacyKeyNames(Object.keys(localStorage))) {
+      found[name.slice(ROOT.length)] = JSON.parse(localStorage.getItem(name));
     }
   } catch (error) {
     return {};
   }
   return found;
+}
+
+// Removes that old data. It is copied into a profile once and must then go, or deleting the last
+// profile would bring it back as a new, empty-looking profile.
+export function clearLegacyData() {
+  try {
+    for (const name of legacyKeyNames(Object.keys(localStorage))) localStorage.removeItem(name);
+  } catch (error) {
+    // Nothing to remove if storage is blocked.
+  }
 }

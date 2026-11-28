@@ -4,6 +4,7 @@
 import { $ } from './dom.js';
 import {
   activeProfileId,
+  clearLegacyData,
   legacyData,
   loadProfileList,
   saveProfileData,
@@ -22,7 +23,8 @@ function adoptOldData() {
   const id = newProfileId();
   const oldProfile = old.profile ?? {};
   const name = oldProfile.name && oldProfile.name !== 'Your name' ? oldProfile.name : 'My profile';
-  saveProfileData(id, old);
+  if (!saveProfileData(id, old)) return;
+  clearLegacyData();
   saveProfileList([{ id, name, weapon: oldProfile.weapon ?? 'Foil', club: oldProfile.club ?? '' }]);
   setActiveProfile(id);
 }

@@ -3,6 +3,7 @@
 import { $ } from './dom.js';
 import {
   activeProfileId,
+  clearLegacyData,
   deleteProfileData,
   loadProfileList,
   saveProfileList,
@@ -44,7 +45,10 @@ export function initProfileMenu() {
     clearTimeout(confirmTimer);
     const id = activeProfileId();
     deleteProfileData(id);
-    saveProfileList(loadProfileList().filter((entry) => entry.id !== id));
+    const remaining = loadProfileList().filter((entry) => entry.id !== id);
+    saveProfileList(remaining);
+    // With no profile left, old pre-profiles data must not be turned into a new one.
+    if (remaining.length === 0) clearLegacyData();
     // Wait for the videos and photos to go before the page reloads, or the reload could cut it short.
     Promise.all([deleteProfileVideos(id), deleteProfilePhotos(id)].map((removal) => removal.catch(() => {}))).then(leaveProfile);
   });
