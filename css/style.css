@@ -981,6 +981,22 @@ form h3 { font-size: 17px; }
   .today-body > .today-weeks { grid-column: 1; grid-row: 2; border-top: 0; margin: 4px 0 0; padding: 0; }
 }
 
+/* ===== Easier to tap on phones and touch screens =====
+   Small controls get a hit area of about 44 px (the size of a fingertip). The tiny round ones keep
+   their look and only grow an invisible edge; buttons and rows simply get taller. */
+@media (max-width: 640px), (pointer: coarse) {
+  .btn.small { min-height: 44px; }
+  .link-btn.small { min-height: 44px; padding: 0 10px; }
+  .icon-btn.small { width: 40px; height: 40px; }
+  .meal-day-toggle, .foldable .fold-title, .settings-fold .fold-title, .today-tray .fold-title, .archive-toggle, .done-toggle, .goal-card-actions, .fencer-links .link-btn, .tg-anytime > * { min-height: 44px; }
+  .today-row { min-height: 40px; }
+  .today-week, .today-more { padding: 12px 0; }
+  .help-btn, .meal-check { position: relative; }
+  .help-btn::after { content: ""; position: absolute; inset: -9px; }
+  .meal-check::after { content: ""; position: absolute; inset: -8px; }
+  .history-remove::after { content: ""; position: absolute; inset: -8px; }
+}
+
 /* ===== Rating strip on the Goals page ===== */
 .rating-strip { margin-top: 12px; padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
 .rating-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
