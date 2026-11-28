@@ -545,7 +545,9 @@ $('#goalArchiveToggle').addEventListener('click', () => {
 
 // How big the goal cards are (Small, Medium or Large), which also sets how many fit on a row.
 // Remembered on this device.
-let cardSize = normalizeCardSize(loadJson('goalCardSize', 'medium'));
+// Until a size is chosen, phones start on Small and bigger screens on Medium.
+const defaultCardSize = window.matchMedia('(max-width: 640px)').matches ? 'small' : 'medium';
+let cardSize = normalizeCardSize(loadJson('goalCardSize', defaultCardSize));
 
 function applyCardSize() {
   $('#goalBoard').style.setProperty('--card-min', CARD_SIZES[cardSize].width + 'px');
