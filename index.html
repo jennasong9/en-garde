@@ -105,6 +105,14 @@
         <p class="welcome-guide">Next you will see your Schedule, empty at first. Tap any day to add your first practice.</p>
         <button class="btn" type="submit">Start training</button>
       </form>
+
+      <section id="wRestore" aria-label="Restore from a backup">
+        <h2>Have a backup file?</h2>
+        <p class="welcome-hint">Restoring from a backup file adds it as a new profile. It never changes a profile you already have.</p>
+        <button class="btn ghost" id="wRestoreBtn" type="button">Restore from a backup file</button>
+        <input type="file" id="wRestoreFile" accept=".json,application/json" hidden>
+        <p class="lookup-status" id="wRestoreStatus" role="status"></p>
+      </section>
     </div>
   </main>
 
@@ -972,6 +980,8 @@
                 <button class="btn ghost" id="switchProfile" type="button">Switch profile</button>
                 <button class="btn danger" id="deleteProfile" type="button">Delete profile</button>
               </div>
+              <button class="btn ghost" id="downloadBackup" type="button">Download backup</button>
+              <p class="tracker-help">Saves this profile's schedule, meals, journal, goals, routines and settings to a file. If a profile is ever deleted, restore it from that file on the welcome screen (Switch profile). Uploaded videos and meal photos are not included.</p>
         </div></div>
       </section>
     </div>

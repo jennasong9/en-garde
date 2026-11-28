@@ -53,6 +53,20 @@ export function saveProfileData(id, data) {
   return Object.entries(data).every(([key, value]) => writeRaw(ACCOUNT_ROOT + id + '.' + key, value));
 }
 
+// Every saved value of one profile, { key: value } (used for a backup file).
+export function readProfileData(id) {
+  const own = ACCOUNT_ROOT + id + '.';
+  const found = {};
+  try {
+    for (const name of Object.keys(localStorage).filter((key) => key.startsWith(own))) {
+      found[name.slice(own.length)] = JSON.parse(localStorage.getItem(name));
+    }
+  } catch (error) {
+    return found;
+  }
+  return found;
+}
+
 // Removes every saved value that belongs to one profile.
 export function deleteProfileData(id) {
   try {

@@ -11,6 +11,7 @@ import {
   saveProfileList,
   setActiveProfile,
 } from './storage.js';
+import { MAX_BACKUP_CHARS, readBackup } from './backup.js';
 import { lookupUrl, parseFencerLink, readProfilePage } from './fencingtracker.js';
 import { cleanDraft, cleanProfileList, newProfileId, profileSummary, startingData, validateNewProfile } from './profiles.js';
 
@@ -168,6 +169,41 @@ async function lookUpTracker() {
   }
 }
 
+// Adds the profile in a chosen backup file as a new profile. It never touches an existing one.
+async function restoreFromFile(file) {
+  const status = $('#wRestoreStatus');
+  const fail = (message) => {
+    status.classList.add('error');
+    status.textContent = message;
+  };
+  status.classList.remove('error');
+  if (file.size > MAX_BACKUP_CHARS) {
+    fail('That file is too big to be an En Garde backup.');
+    return;
+  }
+  let text;
+  try {
+    text = await file.text();
+  } catch (error) {
+    fail('That file could not be opened. Try choosing it again.');
+    return;
+  }
+  const result = readBackup(text);
+  if (result.error) {
+    fail(result.error);
+    return;
+  }
+  const id = newProfileId();
+  if (!saveProfileData(id, result.data)) {
+    fail('Your browser is not letting this page save anything. Check that private browsing or blocked site data is off, then try again.');
+    return;
+  }
+  saveProfileList([...loadProfileList(), { id, ...result.profile }]);
+  showSavedProfiles(cleanProfileList(loadProfileList()));
+  status.textContent = 'Restored "' + result.profile.name + '". Pick it in the list above to open it.';
+  $('#wSaved').scrollIntoView({ block: 'center' });
+}
+
 function createProfile(event) {
   event.preventDefault();
   const result = validateNewProfile(formValues());
@@ -208,6 +244,12 @@ function showWelcome() {
   });
   $('#wNewForm').addEventListener('submit', createProfile);
   $('#wLookup').addEventListener('click', lookUpTracker);
+  $('#wRestoreBtn').addEventListener('click', () => $('#wRestoreFile').click());
+  $('#wRestoreFile').addEventListener('change', (event) => {
+    const [file] = event.target.files;
+    event.target.value = '';
+    if (file) restoreFromFile(file);
+  });
   $('#wNewForm').addEventListener('input', saveDraft);
   $('#wNewForm').addEventListener('click', saveDraft);
   // A refresh in the middle of setup brings back what was typed, and shows the form again.

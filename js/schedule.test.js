@@ -20,6 +20,7 @@ import {
 import { MAX_TEMPLATES, cleanTemplates, defaultTemplateName, fieldsFromTemplate, validateTemplate } from './templates.js';
 import { MAX_PER_GROUP, searchAll } from './search.js';
 import { firstUnfinishedIndex, formatClock, moveStep, stepCounter } from './runmode.js';
+import { BACKUP_VERSION, backupFileName, makeBackup, readBackup } from './backup.js';
 import { legacyKeyNames } from './storage.js';
 import { lookupUrl, parseFencerLink, parseOptionalFencerLink, readProfilePage } from './fencingtracker.js';
 import { defaultPlanName, mealsFromPlan, planSummary, snapshotPlan, validatePlanName } from './mealplans.js';
@@ -2151,6 +2152,47 @@ test('glasses today never go above the goal, and a later goal that is higher sho
 test('the water count says "glass" for a goal of one and "glasses" otherwise', () => {
   equal(todayLine({ sessionCount: 0, doneCount: 0, glasses: 1, goal: 1 }), 'No sessions today \u00b7 1 of 1 glass');
   equal(todayLine({ sessionCount: 0, doneCount: 0, glasses: 2, goal: 5 }), 'No sessions today \u00b7 2 of 5 glasses');
+});
+
+const SAMPLE_DATA = { profile: { name: 'Jenna Song', weapon: 'Foil', club: 'Point Fencing Club', rating: 'B26' }, sessions: [{ id: 's1', date: '2026-11-30', type: 'blade' }], meals: [] };
+
+test('a backup written from a profile reads back with the same name and data', () => {
+  const backup = makeBackup({ name: 'Jenna Song', weapon: 'Foil', club: 'Point Fencing Club' }, SAMPLE_DATA, '2026-11-28T10:00:00.000Z');
+  const result = readBackup(JSON.stringify(backup));
+  equal(result.error, undefined);
+  equal(result.profile, { name: 'Jenna Song', weapon: 'Foil', club: 'Point Fencing Club' });
+  equal(result.data, SAMPLE_DATA);
+});
+
+test('a file that is not a backup is refused with a plain message', () => {
+  const good = makeBackup({ name: 'A', weapon: 'Foil' }, SAMPLE_DATA, 'x');
+  equal(readBackup('').error, 'That file is empty.');
+  equal(readBackup('not json at all').error, 'That file is not an En Garde backup (it could not be read).');
+  equal(readBackup('[1,2]').error, 'That file is not an En Garde backup.');
+  equal(readBackup(JSON.stringify({ ...good, format: 'something-else' })).error, 'That file is not an En Garde backup.');
+  equal(readBackup(JSON.stringify({ ...good, data: {} })).error, 'That backup has no saved data in it.');
+  equal(readBackup(JSON.stringify({ ...good, data: [1] })).error, 'That backup has no saved data in it.');
+});
+
+test('a backup from a newer version, or with odd key names, is refused', () => {
+  const good = makeBackup({ name: 'A', weapon: 'Foil' }, SAMPLE_DATA, 'x');
+  equal(readBackup(JSON.stringify({ ...good, version: BACKUP_VERSION + 1 })).error, 'That backup was made by a newer version of En Garde. Update the app and try again.');
+  equal(readBackup(JSON.stringify({ ...good, data: { 'a.b': 1 } })).error, 'That backup is damaged (it has unexpected entries).');
+  equal(readBackup(JSON.stringify({ ...good, data: { '../x': 1 } })).error, 'That backup is damaged (it has unexpected entries).');
+});
+
+test('a backup without a usable name is refused, and a bad weapon or long club is tidied', () => {
+  const noName = { ...makeBackup({ name: '', weapon: 'Foil' }, { sessions: [] }, 'x') };
+  equal(readBackup(JSON.stringify(noName)).error, 'That backup has no profile name in it.');
+  const odd = makeBackup({ name: 'B', weapon: 'Lance', club: 'C'.repeat(200) }, { sessions: [] }, 'x');
+  const result = readBackup(JSON.stringify(odd));
+  equal([result.profile.weapon, result.profile.club.length], ['Foil', 80]);
+});
+
+test('the backup file name is safe whatever the profile is called', () => {
+  equal(backupFileName('Jenna Song', '2026-11-28'), 'en-garde-backup-jenna-song-2026-11-28.json');
+  equal(backupFileName('../../Zoë <b>', '2026-11-28'), 'en-garde-backup-zo-b-2026-11-28.json');
+  equal(backupFileName('???', '2026-11-28'), 'en-garde-backup-2026-11-28.json');
 });
 
 const failures = results.filter((r) => r.error);
