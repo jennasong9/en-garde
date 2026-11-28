@@ -836,6 +836,12 @@ form h3 { font-size: 17px; }
   :root[data-font="mono"] .page-link { font-size: 11px; letter-spacing: -0.02em; }
   .routine-step-form { grid-template-columns: minmax(0, 1fr); }
   .goal-board { gap: 10px; }
+  /* The card width cannot tell the sizes apart on a phone (Medium and Large are both one column), so each size looks different instead. */
+  .goal-board[data-size="small"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .goal-board[data-size="small"] .goal-card { padding: 12px 10px 8px 12px; gap: 6px; }
+  .goal-board[data-size="small"] .goal-card-name { font-size: 15px; }
+  .goal-board[data-size="large"] .goal-card { padding: 22px 18px 16px 20px; gap: 12px; }
+  .goal-board[data-size="large"] .goal-card-name { font-size: 22px; }
   .nutrition-top { grid-template-columns: 1fr; }
   .macro-target { grid-template-columns: 110px 1fr; }
   .page { padding-top: 16px; }

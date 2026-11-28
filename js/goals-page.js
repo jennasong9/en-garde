@@ -549,6 +549,7 @@ let cardSize = normalizeCardSize(loadJson('goalCardSize', 'medium'));
 
 function applyCardSize() {
   $('#goalBoard').style.setProperty('--card-min', CARD_SIZES[cardSize].width + 'px');
+  $('#goalBoard').dataset.size = cardSize;
   setSwitchButtons($('#goalSizeSwitch'), Object.entries(CARD_SIZES).map(([name, info]) => el('button', {
     class: 'view-btn',
     type: 'button',
