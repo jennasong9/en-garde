@@ -2139,6 +2139,20 @@ test('old pre-profiles saved names are found, and profile data and other sites\'
   equal(legacyKeyNames(['engarde_acct.active']), []);
 });
 
+test('glasses today never go above the goal, and a later goal that is higher shows them again', () => {
+  const day = { date: '2026-11-28', glasses: 5, goal: 5 };
+  equal(glassesToday(day, '2026-11-28'), 5);
+  equal(glassesToday({ ...day, goal: 1 }, '2026-11-28'), 1);
+  equal(glassesToday({ ...day, goal: 3 }, '2026-11-28'), 3);
+  equal(glassesToday({ ...day, goal: 8 }, '2026-11-28'), 5);
+  equal(glassesToday({ ...day, goal: 1 }, '2026-11-29'), 0);
+});
+
+test('the water count says "glass" for a goal of one and "glasses" otherwise', () => {
+  equal(todayLine({ sessionCount: 0, doneCount: 0, glasses: 1, goal: 1 }), 'No sessions today \u00b7 1 of 1 glass');
+  equal(todayLine({ sessionCount: 0, doneCount: 0, glasses: 2, goal: 5 }), 'No sessions today \u00b7 2 of 5 glasses');
+});
+
 const failures = results.filter((r) => r.error);
 const summary = document.getElementById('summary');
 summary.textContent = failures.length === 0

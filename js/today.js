@@ -7,7 +7,7 @@ const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
 // The one line shown when the Today box is folded, such as "1 of 2 sessions done · 3 of 8 glasses".
 export function todayLine({ sessionCount, doneCount, glasses, goal }) {
   const sessions = sessionCount === 0 ? 'No sessions today' : doneCount + ' of ' + plural(sessionCount, 'session') + ' done';
-  return sessions + ' · ' + glasses + ' of ' + goal + ' glasses';
+  return sessions + ' · ' + glasses + ' of ' + goal + (goal === 1 ? ' glass' : ' glasses');
 }
 
 // When the next meal is: its time if it is today (or just "Today" with no time), else "Tomorrow" or the weekday.

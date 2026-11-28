@@ -223,9 +223,12 @@ export function macroWeekHistory(log, days) {
 export const DEFAULT_GLASS_GOAL = 8;
 export const MAX_GLASS_GOAL = 20;
 
-// Glasses logged today. The count belongs to one date, so any other date starts at zero.
+// Glasses logged today. The count belongs to one date, so any other date starts at zero. It never
+// shows more than the goal: lowering the goal to 1 turns "5 of 1" into "1 of 1" (the saved count is
+// kept, so raising the goal again shows the glasses again).
 export function glassesToday(hydration, todayIso) {
-  return hydration.date === todayIso ? hydration.glasses : 0;
+  if (hydration.date !== todayIso) return 0;
+  return Number.isInteger(hydration.goal) && hydration.goal >= 1 ? Math.min(hydration.glasses, hydration.goal) : hydration.glasses;
 }
 
 // Tapping glass number `index` (0-based) fills up to it; tapping the last filled glass undoes it.

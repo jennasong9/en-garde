@@ -70,7 +70,7 @@ function renderWeek() {
     track.style.setProperty('--pct', day.percent + '%');
     return el('div', {
       class: 'water-day' + (day.met ? ' met' : '') + (day.iso === today ? ' today' : ''),
-      title: name + ': ' + day.glasses + ' of ' + day.goal + ' glasses',
+      title: name + ': ' + day.glasses + ' of ' + day.goal + (day.goal === 1 ? ' glass' : ' glasses'),
     }, track, el('span', { class: 'water-day-count', text: String(day.glasses) }), el('span', { class: 'water-day-name', text: name }));
   }));
   const metDays = week.filter((day) => day.met).length;
@@ -84,11 +84,11 @@ function showGlasses(glasses) {
     drop.setAttribute('aria-pressed', String(index < glasses));
   });
   const summary = hydrationSummary(glasses, hydration.goal);
-  $('#hydrationText').textContent = glasses + ' of ' + hydration.goal + ' glasses';
+  $('#hydrationText').textContent = glasses + ' of ' + hydration.goal + (hydration.goal === 1 ? ' glass' : ' glasses');
   $('#hydrationDetail').textContent = summary.ounces + ' of ' + summary.goalOunces + ' oz \u00b7 ' + summary.message;
   $('#waterBar').style.setProperty('--pct', summary.percent + '%');
   $('#waterBar').setAttribute('aria-valuenow', String(summary.percent));
-  setFoldSummary('hydration', glasses + ' of ' + hydration.goal + ' glasses today');
+  setFoldSummary('hydration', glasses + ' of ' + hydration.goal + (hydration.goal === 1 ? ' glass' : ' glasses') + ' today');
 }
 
 // Saves the count. Confetti pops from (x, y) when this release is the one that reaches the goal.
